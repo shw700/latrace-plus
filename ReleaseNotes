@@ -1,0 +1,155 @@
+
+latrace release notes (olsajiri@gmail.com)
+-------------------------------------------------------------------------------
+
+[x] latrace 0.5.11 (7/25/2011)
+	* enhancing names check with *-logic for
+	  "-l -t -f -s -n -b" options
+	* moving conf header files to new location + rename s/conf/h/
+	* adding support for configuration file
+	* global symbol handling
+	  one global symbol tree to rule them all
+	    - only one tree is searched during the plt entry/exit
+	    - symbols are added during the bind audit callback
+	* adding automated test support, so far for x86 and x86_64,
+	  others are disabled.
+	* adding SIGTERM/SIGINT handlers,
+	  refactoring lt_run to check the latrace got killed
+	* adding large file support
+	* make tracer return actual tracee status
+	* several fixies
+		- fix display of char arguments
+		- add threads fifo management to special directory
+		  so the notification is not affected by other files
+		- fix memory leak in the argument display code
+		- fix controled config bug - missing shared config assignment
+		- fixed errors discovered by cppcheck
+		- build fix for ARM
+		- args - use isprint to decide whether to print the character,
+		  force test.sh to use bash,
+		  enable tests for ARM architecture
+		- args - replacing destination strings with void pointers
+	* thanks to the following for patches:
+	    Dr. David Alan Gilbert
+	    Sebastian Pipping
+	    Artur Skawina
+
+
+[x] latrace 0.5.10 (10/13/2010)
+	* added '-n' option, allowing to omit tracing certain symbols
+	* adding stack limits dynamic check (fixing several SIGSEGV issues)
+		- enabled by default, disable by new '-Y' option
+	* several fixies
+		- synchronize --no-* option names
+		- changed config file magic defines
+		- separate arguments display code, so it could be
+		  disabled for not supported architectures
+		- updating license info
+		- fixing output for thread applications
+		  proper tid displayed for pipe mode
+		  proper indentation for pipe mode
+		- changing permissions of libltaudit.so to 755
+
+[x] latrace 0.5.9 (5/14/2010)
+	* fix autoconf search for iberty lib
+	* refactoring sysdep configuration (fix for BZ#586210)
+
+[x] latrace 0.5.8 (4/19/2010)
+	* controled config
+	* added support for enum string refference definition
+	* several fixies
+		- fixed enum handling (strtol failure)
+		- liberty controled by autoconf now
+		- added clone function
+		- added support for pipe mode timestamp display
+		- added snapshot/release targets
+		- added checks for asciidoc and xmlto
+		- added check for liberty-pic
+		- updated .gitignore
+		- shlib doesn't need to be executable
+		- added Debian packaging
+		- relaxed binutils-dev dependency
+		- generate conffiles automatically
+		- debian pkg docbook-xsl and docbook-xml
+
+[x] latrace 0.5.7 (9/4/2009)
+	* added '-B' option to always display the { } around the symbol body
+	* added C++ demangling support - "-d" option
+
+[x] latrace 0.5.6 (7/6/2009)
+	* Fedora rpm package release
+	* several minor fixies:
+		- added support pointers in typedef
+		- fixed minor bug for pointer output
+		- added more checks to configure.ac
+		- make mrproper real propper
+		- added DESTDIR makefile support
+
+[x] latrace 0.5.5 (4/25/2009)
+	x added enum support
+	x added -F option to disable fork following
+	x added -E option to disable exec following
+	x added -T option to hide thread id 
+	x x86_64 - added 'pcC' options , since it looks
+	  glibc bug 7055 got fixed somehow
+	x x86_64 - fixed argument display (fixed glibc bug 9893,
+	  not sure when the glibc fix will be available 2.10?)
+	x stats - added -C sym, fixed -C lib
+	x confs - added syscall.conf (x86_64), mman.conf, resource.conf
+	x asciidoc man/html/txt
+
+[x] latrace 0.5.4 (3/2/2009)
+	x ARM support (EABI)
+	x added config file support for 'float', 'double', 
+	  'long long' and 'unsigned long long'
+	x licensed under GPLv3
+	x initial Debian packaging
+	x ignore 'const' and 'extern' in config files
+	  Make it easier to reuse ordinary .h files (though 
+	  it's still far away).
+	x configuration files are installed into $(sysconfdir);
+	x x86_64 - disabled argument display (options 'AaD'),
+	  because of the glibc bug 9893
+	x x86 - structure display fix
+
+[x] latrace 0.5.3 (12/12/2008)
+	x x86_64 full support
+	x autoreconf compliant
+	x new '-b' option to display flow only below requested symbols
+	x new '-L' option to support objsearch LD_AUDIT interface
+	x bug fixes
+
+[x] latrace 0.5.2 (11/12/2008)
+	x bug fixes
+
+[x] latrace 0.5.1 (10/26/2008)
+	x C like syntax for the config file - typedef/struct/functions (bison/flex)
+	x optional detailed output for structures (by ptr and value)
+	x documentation - doc/expl in the man page
+
+[x] latrace 0.5 (7/7/2008)
+	x display arguments values
+	x compile on x86_64
+
+[x] latrace 0.4 (6/13/2008)
+	x multithread counts support
+	x separate verbose and debug ouput
+	x runtime for each thread
+	x stats - reallocation for symbol hashtable
+	x documentation - initial latrace man page
+
+[x] latrace 0.3 (6/7/2008)
+	x separate verbose logging
+	x indent size configurable
+	x sort counts by user parameter (calls, %, library)
+	x output to file
+	x more statistics counts, time spent in call
+
+[x] latrace 0.2 (5/26/2008)
+	x statistics (like strace -c)
+	x looking for programs in PATH, not just absolute path
+	x symbols deep indentation
+
+[x] latrace 0.1 (5/18/2008)
+	x config symbols to audit
+	x config libraries to audit

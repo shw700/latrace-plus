@@ -1,0 +1,98 @@
+# latrace configuration file - version @CONFIG_VERSION@
+
+# include another configuration file
+# INCLUDE "latrace-user.conf"
+
+OPTIONS {
+	# -a, --args
+	# arguments definition file, implies '-A'
+	# defaults to $sysconfdir/etc/latrace.d/headers/latrace.h
+	# HEADERS = "headers.h"
+
+	# -i, --indent-sym
+	# specify indent size specification
+	INDENT_SYM = 2
+
+	# -p, --pipe
+	# use pipe to latrace process to send audit data
+	# latrace app is then the one displaying the output
+	PIPE = YES
+
+	# -S, --timestamp
+	# display timestamp for each symbol
+	TIMESTAMP = NO
+
+	# -y, --framesize
+	# framesize for storing the stack before pltexit
+	FRAMESIZE = 1000
+
+	# -Y, --no-framesize-check
+	# framesize check
+	FRAMESIZE_CHECK = YES
+
+	# -T, --hide-tid
+	# dont display thread id
+	HIDE_TID = NO
+
+	# -F, --no-follow-fork
+	# dont follow fork calls - childs
+	FOLLOW_FORK = YES
+
+	# -E, --no-follow-exec
+	# dont follow exec calls
+	FOLLOW_EXEC = YES
+
+	# -d, --demangle
+	# run the symbol name throught the C++ demangler
+	DEMANGLE = NO
+
+	# -B, --braces
+	# always display braces {}
+	BRACES = NO
+
+	# -A, --enable-args
+	# enable arguments output (definitions from headers)
+	ENABLE_ARGS = NO
+
+	# -D, --detail-args
+	# display struct arguments in more detail
+	DETAIL_ARGS = NO
+
+	# no command line option equivalent
+	# stores terminal output to the file
+	# OUTPUT_TTY = "output-tty"
+
+	# Following options:
+	# LIBS/LIBS_TO/LIBS_FROM
+	# SYM/SYM_OMIT/SYM_BELOW/SYM_NOEXIT
+	#
+	# use list of names as value.  Single names in the list are
+	# separated by comma ','. If the first char of a single name
+	# is '*', then the name is search for as substring, otherwise
+	# exact match is used.
+
+	# -l, --libs
+	# LIBS = krava.so
+
+	# -t, --libs-to
+	# LIBS_TO = krava.so
+
+	# -f, --libs-from
+	# LIBS_FROM = krava.so
+
+	# -s, --sym
+	# SYM = krava
+
+	# -n, --sym-omit
+	# SYM_OMIT = krava
+
+	# -b, --flow-below
+	# SYM_BELOW = krava
+
+	# no command line option equivalent
+	SYM_NOEXIT = _setjmp
+
+	# no command line option equivalent
+	# function arguments - display string length and pointer value
+	ARGS_STRING_POINTER_LENGTH = NO
+}
