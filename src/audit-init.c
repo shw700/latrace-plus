@@ -106,7 +106,7 @@ static int read_config(char *dir)
 	cfg.sh = cfg.sh_storage.sh = &cfg.sh_storage;
 
 	/*
-	 * If we are not controled, we can close the file,
+	 * If we are not controlled, we can close the file,
 	 * since we read everything we needed.
 	 */
 	close(fd);

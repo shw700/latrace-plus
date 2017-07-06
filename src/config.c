@@ -84,7 +84,7 @@ static void usage()
 	printf("    -T, --hide-tid                  dont display thread id\n");
 	printf("    -o, --output file               store output to file\n");
 	printf("\n");
-	printf("    -R, --ctl-config                controled config\n");
+	printf("    -R, --ctl-config                controlled config\n");
 	printf("    -q, --disable                   disable auditing\n");
 	printf("\n");
 	printf("    -v, --verbose                   verbose output\n");
@@ -422,7 +422,7 @@ int lt_config_ln_fill(struct lt_list_head *head, char *buf, int size)
         return 0;
 }
 
-int lt_config(struct lt_config_app *cfg, int argc, char **argv)
+const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 {
 	memset(cfg, 0, sizeof(*cfg));
 	cfg->sh = cfg->sh_storage.sh = &cfg->sh_storage;
@@ -491,42 +491,42 @@ int lt_config(struct lt_config_app *cfg, int argc, char **argv)
 		switch (c) {
 		case 'l':
 			if (strlen(optarg) >= LT_LIBS_MAXSIZE)
-				return -1;
+				return "Maximum library string size exceeded.";
 
 			process_option_val(cfg, LT_OPT_LIBS, optarg, -1);
 			break;
 
 		case 't':
 			if (strlen(optarg) >= LT_LIBS_MAXSIZE)
-				return -1;
+				return "Maximum library string size exceeded.";
 
 			process_option_val(cfg, LT_OPT_LIBS_TO, optarg, -1);
 			break;
 
 		case 'f':
 			if (strlen(optarg) >= LT_LIBS_MAXSIZE)
-				return -1;
+				return "Maximum library string size exceeded.";
 
 			process_option_val(cfg, LT_OPT_LIBS_FROM, optarg, -1);
 			break;
 
 		case 's':
 			if (strlen(optarg) >= LT_SYMBOLS_MAXSIZE)
-				return -1;
+				return "Maximum symbol string size exceeded.";
 
 			process_option_val(cfg, LT_OPT_SYM, optarg, -1);
 			break;
 
 		case 'n':
 			if (strlen(optarg) >= LT_SYMBOLS_MAXSIZE)
-				return -1;
+				return "Maximum symbol string size exceeded.";
 
 			process_option_val(cfg, LT_OPT_SYM_OMIT, optarg, -1);
 			break;
 
 		case 'b':
 			if (strlen(optarg) >= LT_SYMBOLS_MAXSIZE)
-				return -1;
+				return "Maximum symbol string size exceeded.";
 
 			process_option_val(cfg, LT_OPT_SYM_BELOW, optarg, -1);
 			break;
@@ -583,7 +583,7 @@ int lt_config(struct lt_config_app *cfg, int argc, char **argv)
 
 		case 'L':
 			if (strlen(optarg) > LT_SYMBOLS_MAXSIZE)
-				return -1;
+				return "Maximum symbol string size exceeded.";
 
 			strncpy(lt_sh(cfg, libs_subst), optarg, strlen(optarg));
 			break;
@@ -675,5 +675,5 @@ int lt_config(struct lt_config_app *cfg, int argc, char **argv)
 		usage();
 	}
 
-	return 0;
+	return NULL;
 }

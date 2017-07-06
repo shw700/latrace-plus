@@ -134,12 +134,12 @@ int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 			struct lt_list_head *h);
 int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *sym,
 			struct lt_list_head *h);
-int lt_args_add_typedef(struct lt_config_shared *cfg, char *base,
-	char *new, int pointer);
+int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base,
+	const char *new, int pointer);
 int lt_args_buf_open(struct lt_config_shared *cfg, char *file);
 int lt_args_buf_close(struct lt_config_shared *cfg);
-struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, char *type,
-				char *name, int pointer, int create, char *enum_name);
+struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
+				const char *name, int pointer, int create, char *enum_name);
 int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 			void *pval, struct lt_args_data *data, int last,
 			int dspname);

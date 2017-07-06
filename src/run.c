@@ -56,7 +56,7 @@ static int store_config(struct lt_config_app *cfg, char *file)
 	int mode = S_IRUSR;
 
 	if (lt_sh(cfg, ctl_config)) {
-		printf("controled config: %s\n", file);
+		printf("controlled config: %s\n", file);
 		mode |= S_IWUSR;
 	}
 
@@ -369,9 +369,16 @@ static int run_child(struct lt_config_app *cfg,
 
 	if (0 == (pa->pid = fork())) {
 		char str_audit[100];
+		char *cust_audit_dir;
 
-		sprintf(str_audit, "%s/libltaudit.so.%s", CONFIG_LIBDIR,
-			CONFIG_VERSION);
+		memset(str_audit, 0, sizeof(str_audit));
+
+		if ((cust_audit_dir = getenv("LIBLTAUDIT_PATH"))) {
+			strncpy(str_audit, cust_audit_dir, sizeof(str_audit)-1);
+		} else { 
+			sprintf(str_audit, "%s/libltaudit.so.%s", CONFIG_LIBDIR,
+				CONFIG_VERSION);
+		}
 
 		setenv("LD_AUDIT", str_audit, 1);
 		setenv("LT_DIR", pa->dir, 1);

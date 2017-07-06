@@ -106,21 +106,21 @@ struct lt_config_shared {
 #define LT_CONFIG_MAGIC		((LT_CONFIG_VERSION << 16) + 0xdead)
 	unsigned int magic;
 
-#define LT_LIBS_MAXSIZE     200
+#define LT_LIBS_MAXSIZE     4096
 	char libs_to[LT_LIBS_MAXSIZE];
 	char libs_both[LT_LIBS_MAXSIZE];
 	char libs_from[LT_LIBS_MAXSIZE];
 
 	char libs_subst[LT_LIBS_MAXSIZE];
 
-#define LT_SYMBOLS_MAXSIZE  200
+#define LT_SYMBOLS_MAXSIZE  4096
 	char symbols[LT_SYMBOLS_MAXSIZE];
 	char symbols_omit[LT_SYMBOLS_MAXSIZE];
 	char symbols_noexit[LT_SYMBOLS_MAXSIZE];
 
 	char flow_below[LT_SYMBOLS_MAXSIZE];
 
-#define LT_MAXFILE 200
+#define LT_MAXFILE 4096
 	char output[LT_MAXFILE];
 	FILE *fout;
 
@@ -320,7 +320,7 @@ struct lt_symbol {
 int main_ctl(int argc, char **argv);
 
 /* global */
-int lt_config(struct lt_config_app *cfg, int argc, char **argv);
+const char *lt_config(struct lt_config_app *cfg, int argc, char **argv);
 int lt_run(struct lt_config_app *cfg);
 
 /* fifo */

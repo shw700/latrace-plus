@@ -66,10 +66,13 @@ static int get_type(char *name)
 
 static int main_latrace(int argc, char **argv)
 {
+	const char *lt_err;
 	int ret;
 
-	if (-1 == lt_config(&cfg, argc, argv))
+	if ((lt_err = lt_config(&cfg, argc, argv))) {
+		fprintf(stderr, "Error: %s\n", lt_err);
 		return -1;
+	}
 
 	ret = lt_run(&cfg);
 

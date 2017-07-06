@@ -597,7 +597,7 @@ static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 	return arg;
 }
 
-static struct lt_arg* find_arg(struct lt_config_shared *cfg, char *type, 
+static struct lt_arg* find_arg(struct lt_config_shared *cfg, const char *type, 
 			struct lt_arg argsdef[], int size, int create)
 {
 	int i;
@@ -624,8 +624,8 @@ static struct lt_arg* find_arg(struct lt_config_shared *cfg, char *type,
 	return NULL;
 }
 
-struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, char *type, 
-			char *name, int pointer, int create, char *enum_name)
+struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type, 
+			const char *name, int pointer, int create, char *enum_name)
 {
 	struct lt_arg *arg;
 
@@ -665,8 +665,8 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, char *type,
 	return arg;
 }
 
-int lt_args_add_typedef(struct lt_config_shared *cfg, char *base, 
-	char *new, int pointer)
+int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base, 
+	const char *new, int pointer)
 {
 	struct lt_arg *arg;
 	int i;

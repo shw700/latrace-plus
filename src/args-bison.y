@@ -37,6 +37,18 @@ static struct lt_config_shared *scfg;
 static int struct_alive = 0;
 struct lt_include *lt_args_sinc;
 
+const char *typedef_mapping_table[8][2] =
+{
+	{ "unsigned long long", "u_llong" },
+	{ "signed long long", "llong" },
+	{ "unsigned long", "u_long" },
+	{ "signed long", "long" },
+	{ "unsigned short", "u_short" },
+	{ "signed short", "short" },
+	{ "unsigned char", "u_char" },
+	{ "signed char", "char" },
+};
+
 #define ERROR(fmt, args...) \
 do { \
 	char ebuf[1024]; \
@@ -52,7 +64,7 @@ do { \
 		ERROR("unknown typedef - %s%s%s\n", base, (pointer ? "* " : " "), new); \
 		break; \
 	case  1: \
-		ERROR("typedef alrady defined - %s%s%s\n", base, (pointer ? "* " : " "), new); \
+		ERROR("typedef already defined - %s%s%s\n", base, (pointer ? "* " : " "), new); \
 		break; \
 	case  2: \
 		ERROR("typedef limit reached(%d) - %s%s%s\n", \
@@ -195,6 +207,31 @@ TYPEDEF NAME NAME ';'
 	CHK_TYPEDEF(ret, $2, $3, 0);
 }
 |
+TYPEDEF NAME NAME NAME ';'
+{
+	char *tokname;
+	size_t toklen, i;
+	int found = 0;
+
+	toklen = strlen($2) + strlen($3) + 2;
+	tokname = alloca(toklen);
+	memset(tokname, 0, toklen);
+	snprintf(tokname, toklen, "%s %s", $2, $3);
+
+	for (i = 0; i < sizeof(typedef_mapping_table)/sizeof(typedef_mapping_table[0]); i++) {
+		if (!strcmp(typedef_mapping_table[i][0], tokname)) {
+			int ret = lt_args_add_typedef(scfg, typedef_mapping_table[i][1], $4, 0);
+			CHK_TYPEDEF(ret, typedef_mapping_table[i][1], $4, 0);
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found)
+		ERROR("unknown complex typedef - %s\n", tokname);
+
+}
+|
 TYPEDEF NAME POINTER NAME ';'
 {
 	int ret = lt_args_add_typedef(scfg, $2, $4, 1);
@@ -247,7 +284,7 @@ NAME NAME ENUM_REF
 	struct lt_arg *arg;
 
 	if (NULL == (arg = lt_args_getarg(scfg, $1, $2, 0, 1, $3)))
-		ERROR("unknown argument type - %s\n", $1);
+		ERROR("unknown argument type[1] - %s\n", $1);
 
 	$$ = arg;
 }
@@ -256,7 +293,7 @@ NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $1, $3, 1, 1, $4)))
-		ERROR("unknown argument type - %s\n", $1);
+		ERROR("unknown argument type[2] - %s\n", $1);
 
 	$$ = arg;
 }
@@ -265,7 +302,7 @@ STRUCT NAME NAME
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $3, 0, 1, NULL)))
-		ERROR("unknown argument type - %s\n", $2);
+		ERROR("unknown argument type[3] - %s\n", $2);
 
 	$$ = arg;
 }
@@ -274,7 +311,7 @@ STRUCT NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $4, 1, 1, $5)))
-		ERROR("unknown argument type - %s\n", $2);
+		ERROR("unknown argument type[4] - %s\n", $2);
 
 	$$ = arg;
 }
