@@ -78,8 +78,8 @@ int tty_init(struct lt_config_app *cfg, int master)
 	if (setup_slave(0))
 		longjmp(env, 1);
 
-	dup(0);
-	dup(0);
+	IGN_RET(dup(0));
+	IGN_RET(dup(0));
 	return 0;
 }
 
@@ -98,8 +98,8 @@ int tty_restore(struct lt_config_app *cfg)
 	}
 
 	open("/dev/tty", O_RDWR);
-	dup(0);
-	dup(0);
+	IGN_RET(dup(0));
+	IGN_RET(dup(0));
 
 	return 0;
 }

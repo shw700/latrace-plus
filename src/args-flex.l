@@ -33,11 +33,13 @@ extern struct lt_include *lt_args_sinc;
 %}
 
 alphnum		[-0-9a-zA-Z_]
-name		({alphnum})+
+name		([-0-9a-zA-Z_|/])+
 filename	([-0-9a-zA-Z\./_])+
 
 %x comment include
 %%
+
+"//".*			{ lt_inc_stack(lt_args_sinc)->lineno++; }
 
 "/*"			BEGIN(comment);
 <comment>[^*\n]*	/* eat anything that's not a '*' */
@@ -56,6 +58,7 @@ filename	([-0-9a-zA-Z\./_])+
 <<EOF>>			{ return END; }
 "struct"		{ return STRUCT; }
 "enum"			{ return ENUM; }
+"bm_enum"		{ return BM_ENUM; }
 "typedef"		{ return TYPEDEF; }
 {name}			{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
 "\*"+			{ return POINTER; }

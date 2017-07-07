@@ -50,6 +50,7 @@ static struct lt_include inc = {
 int lt_args_parse_init(struct lt_config_shared *cfg, struct lt_include *inc);
 
 static int enum_init = 0;
+static int bm_enum_init = 0;
 
 
 /* hardcoded POD types */
@@ -233,6 +234,8 @@ static struct lt_arg args_def_typedef[LT_ARGS_DEF_TYPEDEF_NUM];
 static int args_def_struct_cnt  = 0;
 static int args_def_typedef_cnt = 0;
 static struct hsearch_data args_enum_tab;
+static struct hsearch_data args_bm_enum_tab;
+
 
 static struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 {
@@ -260,10 +263,103 @@ static struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
+static struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
+{
+	struct lt_bm_enum *en;
+	ENTRY e, *ep;
+
+	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
+
+	if (!bm_enum_init) {
+		PRINT_VERBOSE(cfg, 1, "no bm_enum added so far\n", name);
+		return NULL;
+	}
+
+	e.key = name;
+	hsearch_r(e, FIND, &ep, &args_bm_enum_tab);
+
+	if (!ep) {
+		PRINT_VERBOSE(cfg, 1, "failed to find bm_enum <%s>\n", name);
+		return NULL;
+	}
+
+	en = (struct lt_bm_enum*) ep->data;
+
+	PRINT_VERBOSE(cfg, 1, "found %p <%s>\n", en, en->name);
+	return en;
+}
+
+static char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt) {
+	char lbuf[1024];
+	unsigned long left = val;
+	struct lt_bm_enum* bm_enum;
+
+	memset(lbuf, 0, sizeof(lbuf));
+
+	if (!class)
+		goto left;
+
+	bm_enum = getbm_enum(cfg, (char *)class);
+
+	if (bm_enum) {
+		size_t i;
+
+		for(i = 0; i < bm_enum->cnt; i++) {
+			struct lt_bm_enum_elem *elem = &bm_enum->elems[i];
+
+			if (elem->val && (left >= elem->val) && ((left & elem->val) == elem->val)) {
+				if (strlen(lbuf))
+					strcat(lbuf, "|");
+
+				strcat(lbuf, elem->name);
+				left &= ~(elem->val);
+			} else if ((val == 0) && (elem->val == 0)) {
+				strcpy(lbuf, elem->name);
+				break;
+			}
+
+		}
+
+	}
+
+left:
+	if (left) {
+		char tmpbuf[32];
+
+		if (strlen(lbuf))
+			strcat(lbuf, "|");
+
+		if (fmt && !strcmp(fmt, "o"))
+			sprintf(tmpbuf, "%o", (unsigned int)left);
+		else if (fmt && !strcmp(fmt, "d"))
+			sprintf(tmpbuf, "%d", (int)left);
+		else if (fmt && !strcmp(fmt, "u"))
+			sprintf(tmpbuf, "%u", (unsigned int)left);
+		else
+			sprintf(tmpbuf, "0x%x", (unsigned int) left);
+
+		if (!strlen(lbuf))
+			strcpy(lbuf, tmpbuf);
+		else
+			strcat(lbuf, tmpbuf);
+		
+	}
+
+	return (strdup(lbuf));
+} 
+
 static int enum_comp(const void *ep1, const void *ep2)
 {
 	struct lt_enum_elem *e1 = (struct lt_enum_elem*) ep1;
 	struct lt_enum_elem *e2 = (struct lt_enum_elem*) ep2;
+
+	return e1->val - e2->val;
+}
+
+static int bm_enum_comp(const void *ep1, const void *ep2)
+{
+	struct lt_bm_enum_elem *e1 = (struct lt_bm_enum_elem*) ep1;
+	struct lt_bm_enum_elem *e2 = (struct lt_bm_enum_elem*) ep2;
 
 	return e1->val - e2->val;
 }
@@ -287,7 +383,7 @@ static struct lt_enum_elem* find_enumelem(struct lt_config_shared *cfg,
 	struct lt_enum_elem *elem;
 	int i;
 
-	for(i = 0; en->cnt; i++) {
+	for(i = 0; i < en->cnt; i++) {
 		elem = &en->elems[i];
 
 		if (!strcmp(elem->name, name))
@@ -409,8 +505,72 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 		last = elem;
 	}
 
-	/* finaly sort the array */
+	/* finally sort the array */
 	qsort(en->elems, en->cnt, sizeof(struct lt_enum_elem), enum_comp);
+	return 0;
+}
+
+int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name, 
+			struct lt_list_head *h)
+{
+	ENTRY e, *ep;
+	struct lt_bm_enum_elem *elem;
+	struct lt_bm_enum *en;
+	int i = 0;
+
+	if (NULL == (en = malloc(sizeof(*en))))
+		return -1;
+
+	memset(en, 0x0, sizeof(*en));
+	en->name = name;
+
+	/* Initialize the hash table holding enum names */
+	if (!bm_enum_init) {
+	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_bm_enum_tab)) {
+	                perror("failed to create has table:");
+			free(en);
+	                return -1;
+	        }
+		bm_enum_init = 1;
+	}
+
+	e.key = en->name;
+	e.data = en;
+
+	if (!hsearch_r(e, ENTER, &ep, &args_bm_enum_tab)) {
+		perror("hsearch_r failed");
+		free(en);
+		return 1;
+	}
+
+	/* We've got enum inside the hash, let's prepare the enum itself.
+	   The 'elems' field is going to be the qsorted list of 
+	   'struct enum_elem's */
+	lt_list_for_each_entry(elem, h, list)
+		en->cnt++;
+
+	if (NULL == (en->elems = malloc(sizeof(struct lt_bm_enum_elem) * en->cnt)))
+		return -1;
+
+	PRINT_VERBOSE(cfg, 3, "bm_enum %s (%d elems) not fixed\n",
+			en->name, en->cnt);
+
+	lt_list_for_each_entry(elem, h, list) {
+
+		PRINT_VERBOSE(cfg, 3, "\t %s = %d\n", elem->name, elem->val);
+
+		en->elems[i++] = *elem;
+	}
+
+	PRINT_VERBOSE(cfg, 3, "bm_enum %s (%d elems) fixed\n",
+			en->name, en->cnt);
+
+	/* fixup values */
+	for(i = 0; i < en->cnt; i++)
+		elem = &en->elems[i];
+
+	/* finally sort the array */
+	qsort(en->elems, en->cnt, sizeof(struct lt_bm_enum_elem), bm_enum_comp);
 	return 0;
 }
 
@@ -454,6 +614,42 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 
 	PRINT_VERBOSE(cfg, 3, "enum elem %s = %d, strval %s, undef = %d\n",
 			elem->name, elem->val, elem->strval, elem->undef);
+	return elem;
+}
+
+struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg, 
+	const char *name, const char *val)
+{
+	struct lt_bm_enum_elem* elem;
+
+	if (NULL == (elem = malloc(sizeof(*elem))))
+		return NULL;
+
+	memset(elem, 0x0, sizeof(*elem));
+
+	if (val) {
+		long num;
+		char *endptr;
+
+		errno = 0;
+		num = strtol(val, &endptr, 0);
+
+		/* parse errors */
+		if ((errno == ERANGE && (num == LONG_MAX || num == LONG_MIN)) || 
+		    (errno != 0 && num == 0)) {
+			free(elem);
+			return NULL;
+		}
+
+		if (endptr != val) {
+			elem->val   = num;
+		}
+
+	}
+
+	elem->name = strdup(name);
+
+	PRINT_VERBOSE(cfg, 3, "bm_enum elem %s = %d\n", elem->name, elem->val);
 	return elem;
 }
 
@@ -592,7 +788,7 @@ static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 
 		lt_list_add_tail(&aa->args_list, h);
 	}
-	
+
 	arg->args_head = h;
 	return arg;
 }
@@ -628,6 +824,26 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 			const char *name, int pointer, int create, char *enum_name)
 {
 	struct lt_arg *arg;
+	char *bitmask = NULL, *fmt = NULL, *name_copy = NULL;
+
+	if (name) {
+		bitmask = strchr(name, '|');
+		fmt = strchr(name, '/');
+	}
+
+	if (bitmask || fmt) {
+		name_copy = strdup(name);
+		bitmask = strchr(name_copy, '|');
+		fmt = strchr(name_copy, '/');
+
+		if (bitmask)
+			*bitmask++ = 0;
+
+		if (fmt)
+			*fmt++ = 0;
+
+		name = name_copy;
+	}
 
 	do {
 		if ((arg = find_arg(cfg, type, 
@@ -661,6 +877,15 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 	   the arg, since there's no reason to go dreper. */
 	if (!arg->pointer)
 		arg->pointer = pointer;
+
+	if (fmt)
+		arg->fmt = strdup(fmt);
+
+	if (bitmask)
+		arg->bitmask_class = strdup(bitmask);
+
+	if (name_copy)
+		free(name_copy);
 
 	return arg;
 }
@@ -766,6 +991,36 @@ static int getstr_addenum(struct lt_config_shared *cfg, struct lt_arg *arg,
 	return 0;
 }
 
+static char *massage_string(const char *s)
+{
+	char *result;
+	size_t rlen, slen, i, d_i;
+
+	slen = strlen(s);
+	rlen = (slen * 2) + 1;
+	result = malloc(rlen);
+	memset(result, 0, rlen);
+
+	for (i = 0, d_i = 0; i < slen; i++) {
+		if ((s[i] != '\n') && (s[i] != '\r'))
+			result[d_i++] = s[i];
+		else {
+			result[d_i++] = '\\';
+
+			if (s[i] == '\n')
+				result[d_i++] = 'n';
+			else if (s[i] == '\r')
+				result[d_i++] = 'r';
+			else
+				result[d_i++] = '?';
+
+		}
+		
+	}
+
+	return result;
+}
+
 static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *arg, 
 				void *pval, char *argbuf, int *arglen)
 {
@@ -817,58 +1072,97 @@ do {                                                                 \
 		len = snprintf(argbuf, alen, FMT, *((TYPE*) pval));  \
 } while(0)
 
-	switch(arg->type_id) {
-	case LT_ARGS_TYPEID_SHORT:  ARGS_SPRINTF("%hd", short); break;
-	case LT_ARGS_TYPEID_USHORT: ARGS_SPRINTF("%hu", unsigned short); break;
-	case LT_ARGS_TYPEID_INT:    ARGS_SPRINTF("%d", int); break;
-	case LT_ARGS_TYPEID_UINT:   ARGS_SPRINTF("%u", unsigned int); break;
-	case LT_ARGS_TYPEID_LONG:   ARGS_SPRINTF("%ld", long); break;
-	case LT_ARGS_TYPEID_ULONG:  ARGS_SPRINTF("%lu", unsigned long); break;
-	case LT_ARGS_TYPEID_LLONG:  ARGS_SPRINTF("%lld", long long); break;
-	case LT_ARGS_TYPEID_ULLONG: ARGS_SPRINTF("%llu", unsigned long long); break;
-	case LT_ARGS_TYPEID_DOUBLE: ARGS_SPRINTF("%lf", double); break;
-	case LT_ARGS_TYPEID_FLOAT:  ARGS_SPRINTF("%f", float); break;
-#undef ARGS_SPRINTF
-	case LT_ARGS_TYPEID_CHAR:
-		if (arg->pointer) {
+	if (arg->bitmask_class) {
+		len = snprintf(argbuf, alen, "%s", lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt));
+	} else if (arg->fmt && (!strcmp(arg->fmt, "o"))) {
+		ARGS_SPRINTF("0%o", unsigned int);
+	} else if (arg->fmt && (!strcmp(arg->fmt, "x"))) {
+		ARGS_SPRINTF("0x%lx", unsigned long);
+	} else if (arg->fmt && (strchr(arg->fmt, 'b'))) {
+		char *tok;
+#define DEFAULT_BINARY_WIDTH 4
+		size_t i = 0, max = DEFAULT_BINARY_WIDTH;
 
-			void *val = *((void**) pval);
+		tok = strchr(arg->fmt, 'b');
+		if (tok > arg->fmt) {
+			char *widths;
+			widths = strndup(arg->fmt, tok-arg->fmt);
 
-			if (val) {
-				char *s = val;
-				int slen = strlen(s);
-				int left = alen;
-				int info_len = 0;
+			if (!(max = atoi(widths)))
+				max = DEFAULT_BINARY_WIDTH;
 
-				if (lt_sh(cfg, args_string_pointer_length)) {
-					info_len = snprintf(argbuf, left, "(%p, %zu) ", s, strlen(s));
-					left -= info_len;
-				}
-
-				if ((slen + 2) > left) {
-					snprintf(argbuf + info_len, left, "\"%s", s);
-					strncpy(argbuf + left - sizeof("...\"") + 1, "...\"", sizeof("...\""));
-				} else {
-					strcpy(argbuf + info_len, "\"");
-					strcat(argbuf, s);
-					strcat(argbuf, "\"");
-				}
-			} else
-				len = snprintf(argbuf, alen, "NULL");
-		} else {
-
-			if (!isprint(*((char*) pval)))
-				len = snprintf(argbuf, alen, "0x%02x",
-						*((unsigned char*) pval));
-			else
-				len = snprintf(argbuf, alen, "0x%02x \'%c\'",
-						*((unsigned char*) pval), *((char*) pval));
+			free(widths);
 		}
-		break;
 
-	case LT_ARGS_TYPEID_VOID:
-		len = snprintf(argbuf, alen, "void");
-		break;
+		strcat(argbuf, "\"");
+
+		for (i = 0; i < max; i++) {
+			char tmpbuf[16];
+			unsigned char *bptr;
+			bptr = (unsigned char *)pval + i;
+			sprintf(tmpbuf, "\\x%.2x", *bptr);
+			strcat(argbuf, tmpbuf);
+			len = strlen(argbuf);
+		}
+
+		strcat(argbuf, "\"");
+	} else {
+		switch(arg->type_id) {
+		case LT_ARGS_TYPEID_SHORT:  ARGS_SPRINTF("%hd", short); break;
+		case LT_ARGS_TYPEID_USHORT: ARGS_SPRINTF("%hu", unsigned short); break;
+		case LT_ARGS_TYPEID_INT:    ARGS_SPRINTF("%d", int); break;
+		case LT_ARGS_TYPEID_UINT:   ARGS_SPRINTF("%u", unsigned int); break;
+		case LT_ARGS_TYPEID_LONG:   ARGS_SPRINTF("%ld", long); break;
+		case LT_ARGS_TYPEID_ULONG:  ARGS_SPRINTF("%lu", unsigned long); break;
+		case LT_ARGS_TYPEID_LLONG:  ARGS_SPRINTF("%lld", long long); break;
+		case LT_ARGS_TYPEID_ULLONG: ARGS_SPRINTF("%llu", unsigned long long); break;
+		case LT_ARGS_TYPEID_DOUBLE: ARGS_SPRINTF("%lf", double); break;
+		case LT_ARGS_TYPEID_FLOAT:  ARGS_SPRINTF("%f", float); break;
+	#undef ARGS_SPRINTF
+		case LT_ARGS_TYPEID_CHAR:
+			if (arg->pointer) {
+
+				void *val = *((void**) pval);
+
+				if (val) {
+					char *s = massage_string(val);
+					int slen = strlen(s);
+					int left = alen;
+					int info_len = 0;
+
+					if (lt_sh(cfg, args_string_pointer_length)) {
+						info_len = snprintf(argbuf, left, "(%p, %zu) ", s, strlen(s));
+						left -= info_len;
+					}
+
+					if ((slen + 2) > left) {
+						snprintf(argbuf + info_len, left, "\"%s", s);
+						strncpy(argbuf + left - sizeof("...\"") + 1, "...\"", sizeof("...\""));
+					} else {
+						strcpy(argbuf + info_len, "\"");
+						strcat(argbuf, s);
+						strcat(argbuf, "\"");
+					}
+
+					free(s);
+				} else
+					len = snprintf(argbuf, alen, "NULL");
+			} else {
+
+				if (!isprint(*((char*) pval)))
+					len = snprintf(argbuf, alen, "0x%02x",
+							*((unsigned char*) pval));
+				else
+					len = snprintf(argbuf, alen, "0x%02x \'%c\'",
+							*((unsigned char*) pval), *((char*) pval));
+			}
+			break;
+
+		case LT_ARGS_TYPEID_VOID:
+			len = snprintf(argbuf, alen, "void");
+			break;
+		}
+
 	}
 
 	if (LT_ARGS_DTYPE_STRUCT == arg->dtype) {

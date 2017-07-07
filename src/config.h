@@ -80,6 +80,7 @@ enum {
 	LT_OPT_FOLLOW_FORK,
 	LT_OPT_FOLLOW_EXEC,
 	LT_OPT_DEMANGLE,
+	LT_OPT_FORMATTING,
 	LT_OPT_BRACES,
 	LT_OPT_ENABLE_ARGS,
 	LT_OPT_DETAIL_ARGS,
@@ -144,6 +145,7 @@ struct lt_config_shared {
 	int indent_size;
 	int braces;
 	int demangle;
+	int lib_short;
 	int counts;
 	int pipe;
 	int hide_tid;
@@ -407,5 +409,7 @@ do { \
 #if defined(__x86_64)
 #include "sysdeps/x86_64/args.h"
 #endif
+
+#define IGN_RET(x)	{ if (x) {} }
 
 #endif // !CONFIG_H

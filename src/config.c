@@ -81,6 +81,7 @@ static void usage()
 	printf("    -i, --indent-sym indent_size    specify indent size specification\n");
 	printf("    -B, --braces                    allways display braces {}\n");
 	printf("    -d, --demangle                  run the symbol name throught the C++ demangler\n");
+	printf("    -x, --format                    specify custom formatting options\n");
 	printf("    -T, --hide-tid                  dont display thread id\n");
 	printf("    -o, --output file               store output to file\n");
 	printf("\n");
@@ -250,6 +251,12 @@ static int process_option_val(struct lt_config_app *cfg, int idx,
 
 		PRINT_VERBOSE(cfg, 1, "DEMANGLE %d\n",
 			      lt_sh(cfg, demangle));
+		break;
+
+	case LT_OPT_FORMATTING:
+		lt_sh(cfg, lib_short) = 1;
+		PRINT_VERBOSE(cfg, 1, "SHORT LIBRARIES %d\n",
+			      lt_sh(cfg, lib_short));
 		break;
 
 	case LT_OPT_BRACES:
@@ -458,6 +465,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			{"indent-sym", required_argument, 0, 'i'},
 			{"braces", no_argument, 0, 'B'},
 			{"demangle", no_argument, 0, 'd'},
+			{"format", required_argument, 0, 'x'},
 			{"timestamp", required_argument, 0, 'S'},
 			{"flow-below", required_argument, 0, 'b'},
 			{"counts", no_argument, 0, 'c'},
@@ -482,7 +490,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			{0, 0, 0, 0}
 		};
 
-		c = getopt_long(argc, argv, "+s:n:l:t:f:vhi:BdISb:cC:y:YL:po:a:N:ADVTFERq",
+		c = getopt_long(argc, argv, "+s:n:l:t:f:vhi:Bdx:ISb:cC:y:YL:po:a:N:ADVTFERq",
 					long_options, &option_index);
 
 		if (c == -1)
@@ -567,6 +575,10 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			#endif
 
 			process_option_val(cfg, LT_OPT_DEMANGLE, NULL, 0);
+			break;
+
+		case 'x':
+			process_option_val(cfg, LT_OPT_FORMATTING, optarg, -1);
 			break;
 
 		case 'I':

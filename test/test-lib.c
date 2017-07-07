@@ -71,9 +71,9 @@ int fout_read(struct lt_config_shared *sh, char *buf, int size)
 	 * would be the solution */
 	bzero(buf, size);
 	rewind(file);
-	fread(buf, size, 1, file);
+	IGN_RET(fread(buf, size, 1, file));
 	rewind(file);
-	ftruncate(fileno(file), 0);
+	IGN_RET(ftruncate(fileno(file), 0));
 	return strlen(buf);
 }
 

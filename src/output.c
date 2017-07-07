@@ -19,6 +19,7 @@
 */
 
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <sys/time.h>
 
@@ -92,6 +93,13 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	/* Demangle the symbol if needed */
 	if (cfg->demangle)
 		DEMANGLE(symname, demangled);
+
+	if (lt_sh(cfg, lib_short)) {
+		char *rptr = strrchr(lib_to, '/');
+
+		if (rptr)
+			lib_to = ++rptr;
+	}
 
 	/* Print the symbol and arguments. */
 	if (*argbuf)

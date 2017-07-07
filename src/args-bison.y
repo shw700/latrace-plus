@@ -82,13 +82,14 @@ do { \
 
 %}
 
-%token NAME FILENAME STRUCT ENUM TYPEDEF INCLUDE END POINTER
+%token NAME FILENAME STRUCT ENUM BM_ENUM TYPEDEF INCLUDE END POINTER
 
 %union
 {
 	char *s;
 	struct lt_arg *arg;
 	struct lt_enum_elem *enum_elem;
+	struct lt_bm_enum_elem *bm_enum_elem;
 	struct lt_list_head *head;
 }
 
@@ -98,6 +99,9 @@ do { \
 %type <head>      ENUM_DEF
 %type <s>         ENUM_REF
 %type <enum_elem> ENUM_ELEM
+%type <head>      BM_ENUM_DEF
+/*%type <s>         BM_ENUM_REF */
+%type <bm_enum_elem> BM_ENUM_ELEM
 %type <head>      ARGS
 %type <arg>       DEF
 
@@ -107,6 +111,8 @@ entry struct_def
 |
 entry enum_def
 | 
+entry bm_enum_def
+|
 entry func_def
 |
 entry type_def
@@ -200,6 +206,45 @@ NAME
 		ERROR("failed to add enum '%s = undef'\n", $1);
 }
 
+
+/* bitmasked enum definitions */
+bm_enum_def:
+BM_ENUM NAME '{' BM_ENUM_DEF '}' ';'
+{
+	switch(lt_args_add_bm_enum(scfg, $2, $4)) {
+	case -1:
+		ERROR("failed to add bm_enum %s\n", $2);
+	case 1:
+		ERROR("bm_enum limit reached(%d) - %s\n", LT_ARGS_DEF_STRUCT_NUM, $2);
+	};
+}
+
+BM_ENUM_DEF:
+BM_ENUM_DEF ',' BM_ENUM_ELEM
+{
+	struct lt_bm_enum_elem *bm_enum_elem = $3;
+	struct lt_list_head *h = $1;
+
+	lt_list_add_tail(&bm_enum_elem->list, h);
+	$$ = h;
+}
+| BM_ENUM_ELEM
+{
+	struct lt_list_head *h;
+	struct lt_bm_enum_elem *bm_enum_elem = $1;
+
+	GET_LIST_HEAD(h);
+	lt_list_add_tail(&bm_enum_elem->list, h);
+	$$ = h;
+}
+
+BM_ENUM_ELEM:
+NAME '=' NAME
+{
+	if (NULL == ($$ = lt_args_get_bm_enum(scfg, $1, $3)))
+		ERROR("failed to add bm_enum '%s = %s'\n", $1, $3);
+}
+
 type_def:
 TYPEDEF NAME NAME ';'
 {
@@ -273,12 +318,41 @@ ARGS ',' DEF
 {
 	GET_LIST_HEAD($$);
 }
-| /* left intentionaly blank */
+| /* left intentionally blank */
 {
 	GET_LIST_HEAD($$);
 }
 
 DEF:
+NAME NAME NAME ENUM_REF
+{
+	struct lt_arg *arg;
+	char *tokname;
+	size_t toklen, i;
+	int found = 0;
+
+	toklen = strlen($1) + strlen($2) + 2;
+	tokname = alloca(toklen);
+	memset(tokname, 0, toklen);
+	snprintf(tokname, toklen, "%s %s", $1, $2);
+
+	for (i = 0; i < sizeof(typedef_mapping_table)/sizeof(typedef_mapping_table[0]); i++) {
+		if (!strcmp(typedef_mapping_table[i][0], tokname)) {
+			arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $3, 0, 1, $4);
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found)
+		arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $3, 0, 1, $4);
+
+	if (!arg)
+                ERROR("unknown argument type[1] - %s\n", $1);
+
+	$$ = arg;
+}
+|
 NAME NAME ENUM_REF
 {
 	struct lt_arg *arg;

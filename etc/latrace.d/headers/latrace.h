@@ -95,3 +95,8 @@
 /* /etc/latrace.d/mman.h */
 #include "mman.h"
 
+/* openssl stuff */
+#include "ssl.h"
+
+/* custom bitmask enumerations */
+#include "enum.h"
