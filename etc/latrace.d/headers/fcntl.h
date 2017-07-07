@@ -2,7 +2,7 @@
 /* /usr/include/fcntl.h */
 
 int fcntl(int fd, int cmd);
-int open(char *file, int oflag);
+int open(char *file, int oflag|open_mode/o);
 int open64(char *file, int oflag);
 int openat(int fd, char *file, int oflag);
 int openat64(int fd, char *file, int oflag);

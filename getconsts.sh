@@ -11,6 +11,7 @@ EXCLUSIONS="IPPROTO_HOPOPTS"
 function grab_between() {
 	PARAM1=`echo -n $2 | sed 's/\//\\\\\//g'`
 	PARAM2=`echo -n $3 | sed 's/\//\\\\\//g'`
+# 	cat $1 | egrep -v '^\s+|^$|^\s*/\*' | sed "/^$PARAM1/,/^$PARAM2/"'!'"d;"
  	cat $1 | egrep -v '^\s+|^$|^\s*/\*' | sed "/$PARAM1/,/$PARAM2/"'!'"d;"
 }
 
@@ -47,7 +48,20 @@ function make_bm_enum() {
 	DATA_ONE_LINE=`echo "$DATA_TRANSFORMED" | tr '\n' ' ' | sed -n 's/ \+/ /gp' | sed 's/ /, /g'`
 	printf "$DATA_ONE_LINE"
 	DATA_LAST_LINE=`echo "$2"| tail -n 1`
-	
+	transform_expression $DATA_LAST_LINE
+	printf "$DATA_LAST_LINE };\n\n"
+}
+
+function make_enum() {
+	printf "enum $1 { "
+	DATA_TRANSFORMED=""
+	for i in `echo "$2" | head -n -1`; do
+		transform_expression $i
+		DATA_TRANSFORMED="$DATA_TRANSFORMED""$TRANSFORM_RESULT"$'\n'
+	done
+	DATA_ONE_LINE=`echo "$DATA_TRANSFORMED" | tr '\n' ' ' | sed -n 's/ \+/ /gp' | sed 's/ /, /g'`
+	printf "$DATA_ONE_LINE"
+	DATA_LAST_LINE=`echo "$2"| tail -n 1`
 	transform_expression $DATA_LAST_LINE
 	printf "$DATA_LAST_LINE };\n\n"
 }
@@ -58,27 +72,24 @@ function run_all() {
 	#grab_until_not /usr/include/linux/netlink.h "#define NETLINK_ROUTE" "#define" | eval $FILTER_ALIASES
 
 	VARDATA=`cat /usr/include/$(uname -m)-linux-gnu/bits/socket.h | egrep "^\s*#define\s+PF_" | sed 's/PF_/AF_/' | awk '{print $2"="$3 }'`
-	make_bm_enum "socket_family" "$VARDATA"
+	make_enum "socket_family" "$VARDATA"
 	VARDATA=`cat /usr/include/$(uname -m)-linux-gnu/bits/socket_type.h | egrep "^\s*SOCK_.+\s=\s.+" | tr -d ',' | awk '{print $1"="$3 }'`
 	make_bm_enum "socket_type" "$VARDATA"
 
 	VARDATA=`cat /usr/include/linux/if_arp.h | egrep "^\s*#define\s+ARPHRD_" | awk '{print $2"="$3 }'`
-	make_bm_enum "arp_hardware" "$VARDATA"
+	make_enum "arp_hardware" "$VARDATA"
 
 	VARDATA=`cat /usr/include/openssl/ssl.h | sed -re 's/^#\s+define/#define/' | egrep "#define\s+SSL_CTRL_" | awk '{print $2"="$3 }'`
-	make_bm_enum "openssl_ctrl_cmd" "$VARDATA"
+	make_enum "openssl_ctrl_cmd" "$VARDATA"
 	VARDATA=`cat /usr/include/openssl/bio.h | sed -re 's/^#\s+define/#define/' | egrep "#define\s+(BIO_CTRL_|BIO_C_)" | cut -d "/" -f1 | awk '{print $2"="$3 }'`
-	make_bm_enum "bio_ctrl_cmd" "$VARDATA"
+	make_enum "bio_ctrl_cmd" "$VARDATA"
 	VARDATA=`cat /usr/include/openssl/bio.h | sed -re 's/^#\s+define/#define/' | egrep "#define\s+BIO_TYPE" | cut -d "/" -f1 | awk '{print $2"="$3 }'`
-	make_bm_enum "bio_type" "$VARDATA"
+	make_enum "bio_type" "$VARDATA"
 
 	VARDATA=`cat /usr/include/asm-generic/fcntl.h | egrep "^\s*#define\s+O_.+\s+0[0-9]+.*" | egrep -v 'IOR|IOW' | awk '{print $2"="$3 }'`
 	make_bm_enum "open_mode" "$VARDATA"
 
 	return
-
-
-
 
 	cat /usr/include/linux/bpf_common.h | egrep "^\s*#define\s+BPF_" | grep -v '(' | awk '{print "bpf "$2" "$3 }'
 
