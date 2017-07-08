@@ -99,7 +99,7 @@ static int read_config(char *dir)
 	}
 
 	if (LT_CONFIG_MAGIC != cfg.sh_storage.magic) {
-		printf("config file magic check failed\n");
+		PRINT_ERROR("%s", "config file magic check failed\n");
 		return -1;
 	}
 
@@ -168,7 +168,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, libs_to)) &&
 	    (-1 == (cfg.libs_to_cnt = get_names(&cfg, lt_sh(&cfg, libs_to),
 						cfg.libs_to)))) {
-		printf("latrace failed to parse libs to\n");
+		PRINT_ERROR("%s", "latrace failed to parse libs to\n");
 		return -1;
 	}
 
@@ -176,7 +176,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, libs_from)) &&
 	    (-1 == (cfg.libs_from_cnt = get_names(&cfg, lt_sh(&cfg, libs_from),
 						  cfg.libs_from)))) {
-		printf("latrace failed to parse libs from\n");
+		PRINT_ERROR("%s", "latrace failed to parse libs from\n");
 		return -1;
 	}
 
@@ -184,7 +184,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, libs_both)) &&
 	    (-1 == (cfg.libs_both_cnt = get_names(&cfg, lt_sh(&cfg, libs_both),
 						  cfg.libs_both)))) {
-		printf("latrace failed to parse libs from\n");
+		PRINT_ERROR("%s", "latrace failed to parse libs from\n");
 		return -1;
 	}
 
@@ -192,7 +192,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, symbols)) &&
 	    (-1 == (cfg.symbols_cnt = get_names(&cfg, lt_sh(&cfg, symbols),
 						cfg.symbols)))) {
-		printf("latrace failed to parse symbols\n");
+		PRINT_ERROR("%s", "latrace failed to parse symbols\n");
 		return -1;
 	}
 
@@ -200,7 +200,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, symbols_omit)) &&
 	    (-1 == (cfg.symbols_omit_cnt = get_names(&cfg, lt_sh(&cfg, symbols_omit),
 						     cfg.symbols_omit)))) {
-		printf("latrace failed to parse symbols to omit\n");
+		PRINT_ERROR("%s", "latrace failed to parse symbols to omit\n");
 		return -1;
 	}
 
@@ -208,7 +208,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, symbols_noexit)) &&
 	    (-1 == (cfg.symbols_noexit_cnt = get_names(&cfg, lt_sh(&cfg, symbols_noexit),
 						       cfg.symbols_noexit)))) {
-		printf("latrace failed to parse noexit symbols\n");
+		PRINT_ERROR("%s", "latrace failed to parse noexit symbols\n");
 		return -1;
 	}
 
@@ -216,7 +216,7 @@ int audit_init(int argc, char **argv, char **env)
 	if ((*lt_sh(&cfg, flow_below)) &&
 	    (-1 == (cfg.flow_below_cnt = get_names(&cfg, lt_sh(&cfg, flow_below),
 						   cfg.flow_below)))) {
-		printf("latrace failed to parse symbols in flow-below option\n");
+		PRINT_ERROR("%s", "latrace failed to parse symbols in flow-below option\n");
 		return -1;
 	}
 
@@ -227,12 +227,12 @@ int audit_init(int argc, char **argv, char **env)
 		int cnt;
 
 		if (-1 == (cnt = get_names(&cfg, lt_sh(&cfg, libs_subst), ptr))) {
-			printf("latrace failed to parse input for subst option\n");
+			PRINT_ERROR("%s", "latrace failed to parse input for subst option\n");
 			return -1;
 		}
 
 		if (-1 == lt_objsearch_init(&cfg, ptr, cnt)) {
-			printf("latrace failed to nitialize subst option\n");
+			PRINT_ERROR("%s", "latrace failed to nitialize subst option\n");
 			return -1;
 		}
 	}
@@ -241,7 +241,7 @@ int audit_init(int argc, char **argv, char **env)
 	lt_sh(&cfg, fout) = stdout;
 	if ((*lt_sh(&cfg, output)) &&
 	    (NULL == (lt_sh(&cfg, fout) = fopen(lt_sh(&cfg, output), "w")))) {
-		printf("latrace failed to open output file %s\n", lt_sh(&cfg, output));
+		PRINT_ERROR("latrace failed to open output file %s\n", lt_sh(&cfg, output));
 		return -1;
 	}
 

@@ -87,7 +87,7 @@ int yywrap()
 
 void lt_args_error(const char *m)
 {
-	printf("header file [%s] line %d: %s\n",
+	PRINT_ERROR("header file [%s] line %d: %s\n", 
 		lt_inc_stack(lt_args_sinc)->file,
 		lt_inc_stack(lt_args_sinc)->lineno,
 		m);

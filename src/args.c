@@ -484,7 +484,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 
 			e = find_enumelem(cfg, elem->strval, en);
 			if (!e) {
-				printf("failed to find '%s=%s' enum definition\n",
+				PRINT_ERROR("failed to find '%s=%s' enum definition\n",
 				       elem->name, elem->strval);
 				return -1;
 			}
@@ -936,10 +936,9 @@ int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base,
 int lt_args_init(struct lt_config_shared *cfg)
 {
 	char *file = LT_CONF_HEADERS_FILE;
-	int ret = 0;
 
 	if (!hcreate_r(LT_ARGS_TAB, &cfg->args_tab)) {
-		perror("failed to create has table:");
+		PRINT_ERROR("Failed to create hash table:", strerror(errno));
 		return -1;
 	}
 
@@ -954,8 +953,8 @@ int lt_args_init(struct lt_config_shared *cfg)
 		return -1;
 
 	if (lt_args_parse()) {
-		printf("failed to header file(s) %s\n", file);
-		ret = -1;
+		PRINT_ERROR("Failed to parse header file(s) %s\n", file);
+		return -1;
 	}
 
 #if defined(LT_ARGS_ARCH_CONF)
@@ -965,12 +964,12 @@ int lt_args_init(struct lt_config_shared *cfg)
 		return -1;
 
 	if (lt_args_parse()) {
-		printf("failed to parse config file %s\n", file);
-		ret = -1;
+		PRINT_ERROR("Failed to parse config file %s\n", file);
+		return -1;
 	}
 #endif
 
-	return ret;
+	return 0;
 }
 
 static int getstr_addenum(struct lt_config_shared *cfg, struct lt_arg *arg,

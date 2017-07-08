@@ -168,7 +168,7 @@ ENUM NAME '{' ENUM_DEF '}' ';'
 {
 	switch(lt_args_add_enum(scfg, $2, $4)) {
 	case -1:
-		ERROR("failed to add enum %s\n", $2);
+		ERROR("failed to add enum[1] %s\n", $2);
 	case 1:
 		ERROR("enum limit reached(%d) - %s\n", LT_ARGS_DEF_STRUCT_NUM, $2);
 	};
@@ -197,13 +197,13 @@ ENUM_ELEM:
 NAME '=' NAME
 {
 	if (NULL == ($$ = lt_args_get_enum(scfg, $1, $3)))
-		ERROR("failed to add enum '%s = %s'\n", $1, $3);
+		ERROR("failed to add enum[2] '%s = %s'\n", $1, $3);
 }
 |
 NAME
 {
 	if (NULL == ($$ = lt_args_get_enum(scfg, $1, NULL)))
-		ERROR("failed to add enum '%s = undef'\n", $1);
+		ERROR("failed to add enum[3] '%s = undef'\n", $1);
 }
 
 
@@ -213,7 +213,7 @@ BM_ENUM NAME '{' BM_ENUM_DEF '}' ';'
 {
 	switch(lt_args_add_bm_enum(scfg, $2, $4)) {
 	case -1:
-		ERROR("failed to add bm_enum %s\n", $2);
+		ERROR("failed to add bm_enum[4] %s\n", $2);
 	case 1:
 		ERROR("bm_enum limit reached(%d) - %s\n", LT_ARGS_DEF_STRUCT_NUM, $2);
 	};

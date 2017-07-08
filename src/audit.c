@@ -45,14 +45,40 @@ static __thread int indent_depth = 0;
 static int check_names(char *name, char **ptr)
 {
 	char *n;
+	int matched = 0;
 
 	for(n = *ptr; n; n = *(++ptr)) {
-		if ((n[0] == '*' && strstr(name, n + 1)) ||
-		    strcmp(name, n) == 0) {
-			PRINT_VERBOSE(&cfg, 2,
-				"return %d for name %s\n", 1, name);
-			return 1;
+		size_t nlen;
+		unsigned char last_char;
+
+		if (!strcmp(name, n)) {
+			matched = 1;
+			break;
 		}
+
+		nlen = strlen(n);
+		last_char = n[nlen-1];
+
+		if (n[0] == '*' && last_char != '*' &&
+		    strcmp(&(n[1]), name) == 0) {
+			matched = 1;
+		}
+		else if (last_char == '*') {
+			if ((n[0] != '*') && (strncmp(name, n, nlen-1) == 0))
+				matched = 1;
+			else if ((n[0] == '*') && (memmem(name, strlen(name), &(n[1]), nlen-2)))
+				matched = 1;
+			
+		}
+
+		if (matched)
+			break;
+	}
+
+	if (matched) {
+		PRINT_VERBOSE(&cfg, 2,
+			"return %d for name %s\n", 1, name);
+		return 1;
 	}
 
 	PRINT_VERBOSE(&cfg, 2, "return %d for name %s\n",
