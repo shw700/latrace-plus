@@ -71,12 +71,15 @@ do { \
 #define DEMANGLE(sym, d)
 #endif
 
+char *color_table[6] = { RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN };
+
 int lt_out_entry(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
 			int indent_depth,
 			const char *symname, char *lib_to,
 			char *argbuf, char *argdbuf)
 {
+	const char *cur_color = NULL;
 	int demangled = 0;
 
 	if (cfg->timestamp && tv)
@@ -87,8 +90,13 @@ int lt_out_entry(struct lt_config_shared *cfg,
 		PRINT_TID(tid);
 
 	/* Print indentation. */
-	if (indent_depth && cfg->indent_sym)
+	if (indent_depth && cfg->indent_sym) {
+
+		if (cfg->fmt_colors)
+			cur_color = color_table[indent_depth % sizeof(color_table)];
+
 		fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
+	}
 
 	/* Demangle the symbol if needed */
 	if (cfg->demangle)
@@ -102,12 +110,22 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	}
 
 	/* Print the symbol and arguments. */
-	if (*argbuf)
-		fprintf(cfg->fout, "%s(%s) [%s] {\n", symname, argbuf, lib_to);
-	else
-		fprintf(cfg->fout, "%s [%s] %c\n", 
-					symname, lib_to,
-					cfg->braces ? '{' : ' ');
+	if (cur_color) {
+		if (*argbuf)
+			fprintf(cfg->fout, "%s%s%s%s(%s%s%s) [%s] {\n",
+				BOLD, cur_color, symname, RESET, cur_color, argbuf, RESET, lib_to);
+		else
+			fprintf(cfg->fout, "%s%s%s [%s] %c\n", 
+						cur_color, symname, RESET, lib_to,
+						cfg->braces ? '{' : ' ');
+	} else {
+		if (*argbuf)
+			fprintf(cfg->fout, "%s(%s) [%s] {\n", symname, argbuf, lib_to);
+		else
+			fprintf(cfg->fout, "%s [%s] %c\n", 
+						symname, lib_to,
+						cfg->braces ? '{' : ' ');
+	}
 
 	if (demangled)
 		free((char*) symname);
@@ -126,6 +144,7 @@ int lt_out_exit(struct lt_config_shared *cfg,
 			const char *symname, char *lib_to,
 			char *argbuf, char *argdbuf)
 {
+	const char *cur_color = NULL;
 	int demangled = 0;
 
 	if (!*argbuf && (!cfg->braces))
@@ -139,8 +158,13 @@ int lt_out_exit(struct lt_config_shared *cfg,
 		PRINT_TID(tid);
 
 	/* Print indentation. */
-	if (indent_depth && cfg->indent_sym)
+	if (indent_depth && cfg->indent_sym) {
+
+		if (cfg->fmt_colors)
+			cur_color = color_table[indent_depth % sizeof(color_table)];
+
 		fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
+	}
 
 	/* We got here, because we have '-B' option enabled. */
 	if (!*argbuf && (cfg->braces)) {
@@ -153,7 +177,10 @@ int lt_out_exit(struct lt_config_shared *cfg,
 		DEMANGLE(symname, demangled);
 
 	/* Print the symbol and arguments. */
-	fprintf(cfg->fout, "} %s%s\n", symname, argbuf);
+	if (cur_color)
+		fprintf(cfg->fout, "} %s%s%s%s%s\n", BOLD, cur_color, symname, RESET, argbuf);
+	else
+		fprintf(cfg->fout, "} %s%s\n", symname, argbuf);
 
 	if (demangled)
 		free((char*) symname);

@@ -146,6 +146,7 @@ struct lt_config_shared {
 	int braces;
 	int demangle;
 	int lib_short;
+	int fmt_colors;
 	int counts;
 	int pipe;
 	int hide_tid;
@@ -407,6 +408,7 @@ do { \
 } while(0)
 
 #define RESET   "\033[0m"
+#define BOLD	"\033[1m"
 #define BLACK   "\033[30m"      /* Black */
 #define RED     "\033[31m"      /* Red */
 #define GREEN   "\033[32m"      /* Green */

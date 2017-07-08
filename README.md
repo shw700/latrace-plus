@@ -34,3 +34,8 @@ Individual function sub-routine expansion can also be suppressed by appending an
 For example: void ERR_load_crypto_strings!(void);
 results in the suppression of the expansion of all subroutines called internally by the ERR_load_crypto_strings() function.
 
+
+Other new options:
+
+latrace -x s		Display library names in short format (without absolute path prefix)
+latrace -x c		Display subroutine calls with ANSI color (indentation must also be enabled)

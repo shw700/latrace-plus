@@ -254,9 +254,12 @@ static int process_option_val(struct lt_config_app *cfg, int idx,
 		break;
 
 	case LT_OPT_FORMATTING:
-		lt_sh(cfg, lib_short) = 1;
-		PRINT_VERBOSE(cfg, 1, "SHORT LIBRARIES %d\n",
-			      lt_sh(cfg, lib_short));
+		if (strchr(sval, 's'))
+			lt_sh(cfg, lib_short) = 1;
+		if (strchr(sval, 'c'))
+			lt_sh(cfg, fmt_colors) = 1;
+		PRINT_VERBOSE(cfg, 1, "FORMATTING %s\n",
+			      sval);
 		break;
 
 	case LT_OPT_BRACES:
@@ -441,6 +444,8 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 	lt_sh(cfg, fout)            = stdout;
 	lt_sh(cfg, indent_sym)      = 1;
 	lt_sh(cfg, indent_size)     = 2;
+	lt_sh(cfg, lib_short)       = 0;
+	lt_sh(cfg, fmt_colors)      = 0;
 	lt_sh(cfg, args_maxlen)     = LR_ARGS_MAXLEN;
 	lt_sh(cfg, args_detail_maxlen) = LR_ARGS_DETAIL_MAXLEN;
 	cfg->csort = LT_CSORT_CALL;
