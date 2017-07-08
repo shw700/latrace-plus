@@ -213,7 +213,7 @@ BM_ENUM NAME '{' BM_ENUM_DEF '}' ';'
 {
 	switch(lt_args_add_bm_enum(scfg, $2, $4)) {
 	case -1:
-		ERROR("failed to add bm_enum[4] %s\n", $2);
+		ERROR("failed to add bm_enum[1] %s\n", $2);
 	case 1:
 		ERROR("bm_enum limit reached(%d) - %s\n", LT_ARGS_DEF_STRUCT_NUM, $2);
 	};
@@ -242,7 +242,7 @@ BM_ENUM_ELEM:
 NAME '=' NAME
 {
 	if (NULL == ($$ = lt_args_get_bm_enum(scfg, $1, $3)))
-		ERROR("failed to add bm_enum '%s = %s'\n", $1, $3);
+		ERROR("failed to add bm_enum[2] '%s = %s'\n", $1, $3);
 }
 
 type_def:
@@ -288,11 +288,20 @@ func_def:
 DEF '(' ARGS ')' ';'
 {
 	struct lt_arg *arg = $1;
+	size_t alen;
+	int collapsed = 0;
 
-	if (lt_args_add_sym(scfg, arg, $3))
+	alen = strlen(arg->name);
+
+	if (alen && (arg->name[alen-1] == '!')) {
+		arg->name[alen-1] = 0;
+		collapsed = 1;
+	}
+
+	if (lt_args_add_sym(scfg, arg, $3, collapsed))
 		ERROR("failed to add symbol %s\n", arg->name);
 
-	/* force cration of the new list head */
+	/* force creation of the new list head */
 	$3 = NULL;
 }
 

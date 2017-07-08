@@ -316,6 +316,7 @@ struct lt_symbol {
 	const char *name;
 	/* symbol address */
 	void *ptr;
+	int collapsed;
 };
 
 /* ctl */

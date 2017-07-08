@@ -120,6 +120,7 @@ struct lt_args_sym {
 	char *name;
 
 	int argcnt;
+	int collapsed;
 #define LT_ARGS_RET 0
 	struct lt_arg **args;
 };
@@ -162,7 +163,7 @@ struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg, const 
 int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 			struct lt_list_head *h);
 int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *sym,
-			struct lt_list_head *h);
+			struct lt_list_head *h, int collapsed);
 int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base,
 	const char *new, int pointer);
 int lt_args_buf_open(struct lt_config_shared *cfg, char *file);

@@ -93,6 +93,7 @@ struct lt_symbol* lt_symbol_bind(struct lt_config_shared *cfg,
 {
 	static struct lt_symbol *sym = NULL;
 	struct lt_symbol *s = NULL;
+	struct lt_args_sym *a;
 	void *val;
 
 	PRINT_VERBOSE(cfg, 1, "checking %s(%p)\n", name, ptr);
@@ -114,6 +115,9 @@ struct lt_symbol* lt_symbol_bind(struct lt_config_shared *cfg,
 	bzero(sym, sizeof(*sym));
 	sym->ptr  = ptr;
 	sym->name = name;
+
+	if ((a = lt_args_sym_get(cfg, name)))
+		sym->collapsed = a->collapsed;
 
 	/* do we care about this symbol? */
 	if (symbol_init(cfg, sym, name))

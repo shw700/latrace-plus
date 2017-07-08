@@ -60,7 +60,7 @@ filename	([-0-9a-zA-Z\./_])+
 "enum"			{ return ENUM; }
 "bm_enum"		{ return BM_ENUM; }
 "typedef"		{ return TYPEDEF; }
-{name}			{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
+{name}!?		{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
 "\*"+			{ return POINTER; }
 ")"			{ return ')'; }
 "("			{ return '('; }

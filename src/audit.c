@@ -40,6 +40,8 @@ extern struct lt_config_audit cfg;
 static __thread int pipe_fd = 0;
 static __thread int flow_below_stack = 0;
 static __thread int indent_depth = 0;
+static __thread char suppress_while[128];
+static __thread int suppress_nested = 0;
 
 
 static int check_names(char *name, char **ptr)
@@ -116,14 +118,28 @@ static int sym_entry(const char *symname, void *ptr,
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
 
+	// Make sure we keep track of recursive/repeated calls to ourselves.
+	if (suppress_while[0]) {
+		if (!strcmp(suppress_while, symname))
+			suppress_nested++;
+
+		return -1;
+	}
+
 	if (cfg.flow_below_cnt && !check_flow_below(symname, 1))
-		return 0;
+		return -1;
 
 	if (lt_sh(&cfg, timestamp) || lt_sh(&cfg, counts))
 		gettimeofday(&tv, NULL);
 
 	if (lt_sh(&cfg, global_symbols))
 		sym = lt_symbol_get(cfg.sh, ptr, symname);
+
+	if (sym && sym->collapsed) {
+		strncpy(suppress_while, sym->name, sizeof(suppress_while)-1);
+		suppress_while[sizeof(suppress_while)-1] = 0;
+		suppress_nested++;
+	}
 
 #ifdef CONFIG_ARCH_HAVE_ARGS
 	argret = lt_sh(&cfg, args_enabled) ?
@@ -165,6 +181,17 @@ static int sym_exit(const char *symname, void *ptr,
 	struct lt_symbol *sym = NULL;
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
+
+	if (suppress_while[0]) {
+		if (!strcmp(suppress_while, symname)) {
+			suppress_nested--;
+
+			if (!suppress_nested)
+				memset(suppress_while, 0, sizeof(suppress_while));
+		}
+		else
+			return 0;
+	}
 
 	if (cfg.flow_below_cnt && !check_flow_below(symname, 0))
 		return 0;
@@ -345,18 +372,22 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 {
 	struct link_map *lr = (struct link_map*) *refcook;
 	struct link_map *ld = (struct link_map*) *defcook;
+	int ret = 0;
 
 	do {
 		CHECK_DISABLED(sym->st_value);
 
 		CHECK_PID(sym->st_value);
 
-		sym_entry(symname, (void*) sym->st_value,
+		ret = sym_entry(symname, (void*) sym->st_value,
 			  lr ? lr->l_name : NULL,
 			  ld ? ld->l_name : NULL,
 			  regs);
 
 	} while(0);
+
+	if (ret < 0)
+		return sym->st_value;
 
 	*framesizep = lt_stack_framesize(&cfg, regs);
 

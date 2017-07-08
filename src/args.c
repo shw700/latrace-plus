@@ -694,7 +694,7 @@ int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 }
 
 int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret, 
-			struct lt_list_head *h)
+			struct lt_list_head *h, int collapsed)
 {
 	ENTRY e, *ep;
 	struct lt_args_sym *sym;
@@ -711,6 +711,7 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 	sym->name = ret->name;
 
 	sym->argcnt = 1;
+	sym->collapsed = collapsed;
 	lt_list_for_each_entry(arg, h, args_list)
 		sym->argcnt++;
 
@@ -938,7 +939,7 @@ int lt_args_init(struct lt_config_shared *cfg)
 	char *file = LT_CONF_HEADERS_FILE;
 
 	if (!hcreate_r(LT_ARGS_TAB, &cfg->args_tab)) {
-		PRINT_ERROR("Failed to create hash table:", strerror(errno));
+		PRINT_ERROR("Failed to create hash table: %s", strerror(errno));
 		return -1;
 	}
 
