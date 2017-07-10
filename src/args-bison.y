@@ -335,10 +335,9 @@ ARGS ',' DEF
 DEF:
 NAME NAME NAME ENUM_REF
 {
-	struct lt_arg *arg;
+	struct lt_arg *arg = NULL;
 	char *tokname;
 	size_t toklen, i;
-	int found = 0;
 
 	toklen = strlen($1) + strlen($2) + 2;
 	tokname = alloca(toklen);
@@ -348,13 +347,9 @@ NAME NAME NAME ENUM_REF
 	for (i = 0; i < sizeof(typedef_mapping_table)/sizeof(typedef_mapping_table[0]); i++) {
 		if (!strcmp(typedef_mapping_table[i][0], tokname)) {
 			arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $3, 0, 1, $4);
-			found = 1;
 			break;
 		}
 	}
-
-	if (!found)
-		arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $3, 0, 1, $4);
 
 	if (!arg)
                 ERROR("unknown argument type[1] - %s\n", $1);
