@@ -19,8 +19,8 @@
 
 # libltaudit.so 
 AUDIT_BIN=libltaudit.so.$(CONFIG_VERSION)
-AUDIT_LDFLAGS="-Wl,-init=audit_init" "-Wl,-soname,$(AUDIT_BIN)" -fPIC -shared $(LDFLAGS)
-AUDIT_LIBS=$(LIBS) $(LEXLIB)
+AUDIT_LDFLAGS="-Wl,-init=audit_init" "-Wl,-soname,$(AUDIT_BIN)" -fPIC -shared $(LDFLAGS) -Wl,--no-as-needed
+AUDIT_LIBS=$(LIBS) $(LEXLIB) -ldl -lelf
 
 AUDIT_OBJS=\
 	src/audit.o \

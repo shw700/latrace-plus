@@ -23,6 +23,7 @@
 #define CONFIG_H
 
 #include <stdio.h>
+#include <string.h>
 #include <search.h>
 #include <sys/time.h>
 #include <sys/syscall.h>
@@ -53,6 +54,7 @@
 #define LT_ARGS_DEF_STRUCT_NUM  1000
 #define LT_ARGS_DEF_TYPEDEF_NUM 1000
 #define LT_ARGS_DEF_ENUM_NUM    1000
+#define LT_ARGS_STRUCT_XFM_NUM  1000
 
 
 enum { 
@@ -426,7 +428,7 @@ do { \
 #define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
-#define PRINT_COLOR(color, fmt, ...)	fprintf(stderr, color fmt RESET, __VA_ARGS__);
+#define PRINT_COLOR(color, fmt, ...)	fprintf(stderr, color fmt RESET, __VA_ARGS__)
 #define PRINT_ERROR(fmt, ...)		PRINT_COLOR(BOLDRED, fmt, __VA_ARGS__)
 
 

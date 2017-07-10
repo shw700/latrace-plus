@@ -44,6 +44,7 @@ enum {
 	LT_ARGS_TYPEID_ULLONG,
 	LT_ARGS_TYPEID_DOUBLE,
 	LT_ARGS_TYPEID_FLOAT,
+	LT_ARGS_TYPEID_USER_DEF,
 
 	LT_ARGS_TYPEID_CUSTOM = 1000
 };
@@ -104,6 +105,9 @@ struct lt_arg {
 	/* auxiliary interpretation parameters */
 	char *fmt;
 	char *bitmask_class;
+
+	/* custom user-defined transformer */
+	int (*latrace_custom_struct_transformer)(void *obj, char *buf, size_t blen);
 };
 
 struct lt_bitmask_value {

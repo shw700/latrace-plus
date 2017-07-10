@@ -578,6 +578,46 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		int last = (i + 1) == asym->argcnt;
 
 		pval = get_value(cfg, arg, regs, 0);
+
+		if (pval && arg->latrace_custom_struct_transformer) {
+			void *pvald = *((void**) pval);
+			char *saved_args_buf;
+			size_t left, saved_arglen, saved_totlen;
+			int result;
+
+			saved_args_buf = data->args_buf;
+			saved_arglen = data->arglen;
+			saved_totlen = data->args_totlen;
+			left = data->arglen - data->args_totlen;
+			memset(data->args_buf, 0, left);
+			left--;
+			result = snprintf(data->args_buf+data->args_totlen, left, "%s=", arg->name);
+			data->args_totlen += result;
+			left -= result;
+
+			if (i+1 < asym->argcnt)
+				left -= 2;
+
+			result = arg->latrace_custom_struct_transformer(pvald, data->args_buf+data->args_totlen, left);
+
+			if (!result) {
+				data->args_totlen += strlen(data->args_buf+data->args_totlen);
+
+				if (i+1 < asym->argcnt) {
+					strcat(data->args_buf+data->args_totlen, ", ");
+					data->args_totlen += 2;
+				}
+
+				continue;
+			} else {
+				data->args_buf = saved_args_buf;
+				data->arglen = saved_arglen;
+				data->args_totlen = saved_totlen;
+				memset(data->args_buf+data->args_totlen, 0, data->arglen-data->args_totlen);
+			}
+
+		}
+
 		if ((!pval) && 
 		    (arg->pointer || (LT_ARGS_DTYPE_STRUCT != arg->dtype))) {
 			PRINT_VERBOSE(cfg, 2,

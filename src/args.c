@@ -35,6 +35,7 @@
 
 extern int errno;
 extern FILE *lt_args_in;
+extern struct hsearch_data args_struct_xfm_tab;
 int  lt_args_parse();
 void lt_args__switch_to_buffer (YY_BUFFER_STATE new_buffer  );
 void lt_args__delete_buffer (YY_BUFFER_STATE b  );
@@ -224,6 +225,19 @@ static struct lt_arg args_def_pod[] = {
 		.args_head = NULL,
 		.args_list = { NULL, NULL }
 	},
+	{
+		.dtype     = LT_ARGS_DTYPE_POD,
+		.type_id   = LT_ARGS_TYPEID_USER_DEF,
+		.type_len  = sizeof(void *),
+		.type_name = "custom_user_struct_transformer",
+		.pointer   = 0,
+		.name      = "",
+		.mmbcnt    = 0,
+                .arch      = NULL,
+		.en        = NULL,
+		.args_head = NULL,
+		.args_list = { NULL, NULL }
+	}
 };
 
 #define LT_ARGS_DEF_POD_NUM     (sizeof(args_def_pod)/sizeof(struct lt_arg))
@@ -410,7 +424,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	/* Initialize the hash table holding enum names */
 	if (!enum_init) {
 	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_enum_tab)) {
-	                perror("failed to create has table:");
+	                perror("failed to create hash table:");
 			free(en);
 	                return -1;
 	        }
@@ -527,7 +541,7 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	/* Initialize the hash table holding enum names */
 	if (!bm_enum_init) {
 	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_bm_enum_tab)) {
-	                perror("failed to create has table:");
+	                perror("failed to create hash table:");
 			free(en);
 	                return -1;
 	        }
@@ -847,6 +861,8 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 	}
 
 	do {
+		ENTRY e, *ep;
+
 		if ((arg = find_arg(cfg, type, 
 			args_def_pod, LT_ARGS_DEF_POD_NUM, create)))
 			break;
@@ -858,6 +874,21 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		if ((arg = find_arg(cfg, type, 
 			args_def_typedef, args_def_typedef_cnt, create)))
 			break;
+
+		if (!create)
+			return NULL;
+
+		e.key = (char *)type;
+
+		if (hsearch_r(e, FIND, &ep, &args_struct_xfm_tab)) {
+			arg = find_arg(cfg, "custom_user_struct_transformer", args_def_pod, LT_ARGS_DEF_POD_NUM, create);
+
+			if (arg) {
+				arg->latrace_custom_struct_transformer = (void *)ep->data;
+				break;
+			}
+
+		}
 
 		return NULL;
 

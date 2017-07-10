@@ -39,3 +39,18 @@ Other new options:
 
 latrace -x s		Display library names in short format (without absolute path prefix)
 latrace -x c		Display subroutine calls with ANSI color (indentation must also be enabled)
+
+
+
+
+User transformer libraries:
+Shared libraries with transformers should be dropped into /etc/latrace.d/transformers, where they will be automatically loaded.
+
+Custom user struct transformer functions should be visibly exported and declared as follows: int latrace_struct_to_str_xxx(xxx *obj, char *buf, size_t blen);
+where xxx is the name of the structure in question.
+
+For example, imagine this module being used in conjunction with the stdio library functions:
+int latrace_struct_to_str_FILE(FILE *obj, char *buf, size_t blen);
+
+The function takes a buffer and a size of a buffer where a user-defined structure description will be left as a null-terminated string.
+The user handler should return 0 on success or -1 on failure.

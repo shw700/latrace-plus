@@ -29,9 +29,15 @@
 #include <sys/mman.h>
 #include <errno.h>
 
+#include <libelf.h>
+#include <gelf.h>
+#include <glob.h>
+
 #include "config.h"
 
 struct lt_config_audit cfg;
+struct hsearch_data args_struct_xfm_tab;
+
 
 static int init_ctl_config(char *file)
 {
@@ -153,10 +159,211 @@ static int get_names(struct lt_config_audit *cfg, char *names, char **ptr)
 	return cnt;
 }
 
+static size_t get_symtab_size(const char *filename)
+{
+	Elf *elf;
+	int fd;
+
+	if ((fd = open(filename, O_RDONLY)) < 0) {
+		perror("open");
+		return 0;
+	}
+
+	if (elf_version(EV_CURRENT) == EV_NONE) {
+		PRINT_ERROR("elf_version: %s\n", elf_errmsg(elf_errno()));
+		close(fd);
+		return 0;
+	}
+
+	if ((elf = elf_begin(fd, ELF_C_READ, NULL)) == 0) {
+		PRINT_ERROR("Error reading ELF header of shared object: %s\n", filename);
+		PRINT_ERROR("elf_begin: %s\n", elf_errmsg(elf_errno()));
+		close(fd);
+		return 0;
+	}
+
+	Elf_Scn *section = elf_getscn(elf, 0);
+
+	while (section) {
+		GElf_Shdr shdr;
+		gelf_getshdr(section, &shdr);
+
+		if (shdr.sh_type == SHT_SYMTAB) {
+			Elf_Data *data;
+			size_t i, sym_count;
+
+			sym_count = shdr.sh_size / shdr.sh_entsize;
+			data = elf_getdata(section, NULL);
+
+			for (i = 0; i < (shdr.sh_size / shdr.sh_entsize); i++) {
+			        GElf_Sym sym;
+			        gelf_getsym(data, i, &sym);
+
+				if (!sym.st_name || ELF64_ST_TYPE(sym.st_info) > STT_FUNC)
+					sym_count--;
+				else {
+/*			        PRINT_ERROR("strname %s\n", elf_strptr(elf, shdr.sh_link, sym.st_name));
+				PRINT_ERROR("name = %u, hehe index = %d, value = %lx, size = %lu, type = %d\n", sym.st_name, sym.st_shndx, sym.st_value, sym.st_size, ELF64_ST_TYPE(sym.st_info));
+				PRINT_ERROR("bind = %d, type = %d\n", ELF64_ST_BIND(sym.st_info), ELF64_ST_TYPE(sym.st_info)); */
+				}
+
+			}
+
+
+			close(fd);
+			return sym_count;
+		}
+
+		section = elf_nextscn(elf, section);
+	}
+
+	close(fd);
+	return 0;
+}
+
+
+static int setup_struct_transformers(void)
+{
+
+	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_struct_xfm_tab)) {
+		perror("failed to create hash table:");
+		return -1;
+	}
+
+	return 0;
+}
+
+
+int glob_err(const char *epath, int eerrno) {
+	PRINT_ERROR("Encountered globbing error: %s\n", strerror(eerrno));
+	return 0;
+}
+
+#define STRUCT_TRANSFORM_PREFIX	"latrace_struct_to_str_"
+int init_custom_handlers(struct lt_config_audit *cfg)
+{
+	glob_t rglob;
+	size_t i;
+	int ret;
+
+	if (setup_struct_transformers() < 0) {
+		PRINT_ERROR("%s", "Unexpected error setting up function transformers table");
+		return -1;
+	}
+
+	ret = glob("/etc/latrace.d/transformers/*.so", GLOB_ERR, glob_err, &rglob);
+
+	if (ret != 0 && ret != GLOB_NOMATCH) {
+		PRINT_ERROR("Unable to read transformers libraries directory: %s\n", strerror(errno));
+		return -1;
+	}
+
+	for (i = 0; i < rglob.gl_pathc; i++) {
+		struct link_map *lmap = NULL;
+		Elf64_Dyn *dyn;
+		Elf64_Sym *symtab = NULL;
+		void *handle;
+		char *lpath = rglob.gl_pathv[i], *strtab = NULL, *symstr;
+		size_t symtab_size, sym_count = 0;
+
+		PRINT_VERBOSE(cfg, 1, "Checking user-supplied transformer library: %s\n", lpath);
+
+		if (!(handle = dlopen(lpath, RTLD_NOW|RTLD_LOCAL))) {
+			PRINT_ERROR("Error loading shared library %s: %s\n", lpath, dlerror());
+			continue;
+		}
+
+		if (dlinfo(handle, RTLD_DI_LINKMAP, &lmap) != 0) {
+			PRINT_ERROR("Error retrieving shared library info for %s: %s\n", lpath, dlerror());
+			dlclose(handle);
+			continue;
+		}
+
+		dyn = (Elf64_Dyn *) lmap->l_ld;
+
+		while (dyn->d_tag != DT_NULL) {
+
+			if (dyn->d_tag == DT_SYMTAB) {
+				symtab = (Elf64_Sym *)dyn->d_un.d_ptr;
+				PRINT_VERBOSE(cfg, 2, "Symtab of %s found at %p\n", lpath, (void *)dyn->d_un.d_ptr);
+			} else if (dyn->d_tag == DT_SYMENT) {
+				PRINT_VERBOSE(cfg, 3, "Determined syment size of transformer lib %s: %lu\n", lpath, dyn->d_un.d_val);
+
+				if (dyn->d_un.d_val != sizeof(Elf64_Sym)) {
+					PRINT_ERROR("Unexpected ELF object symbol table entry size was %lu bytes vs %zu\n", dyn->d_un.d_val, sizeof(Elf64_Sym));
+					dlclose(handle);
+					continue;
+				}
+
+			}
+			else if (dyn->d_tag == DT_STRTAB) {
+				strtab = (char *)dyn->d_un.d_ptr;
+				PRINT_VERBOSE(cfg, 2, "String table of %s found at %p\n", lpath, (void *)dyn->d_un.d_ptr);
+			}
+
+			dyn++;
+		}
+
+		if (!symtab) {
+			PRINT_ERROR("Error: could not determine address of symbol table for transformer library %s", lpath);
+			dlclose(handle);
+			continue;
+		} else if (!strtab) {
+			PRINT_ERROR("Error: could not determine address of string table for transformer library %s", lpath);
+			dlclose(handle);
+			continue;
+		}
+
+		symtab_size = get_symtab_size(lpath);
+		PRINT_VERBOSE(cfg, 2, "In-memory symtab size of %s: %zu entries\n", lpath, symtab_size);
+
+		while (sym_count < symtab_size) {
+
+			if (ELF64_ST_TYPE(symtab->st_info) == STT_FUNC) {
+				symstr = strtab + symtab->st_name;
+				PRINT_VERBOSE(cfg, 3, "Found exported function in %s: %s @ %p\n", lpath, symstr, (void *)symtab->st_value);
+
+				if (!strncmp(symstr, STRUCT_TRANSFORM_PREFIX, strlen(STRUCT_TRANSFORM_PREFIX))) {
+					void *sym_addr;
+					char *funcname = symstr + strlen(STRUCT_TRANSFORM_PREFIX);
+					ENTRY e, *ep;
+
+					PRINT_VERBOSE(cfg, 1, "Adding user struct transformer function for type: %s\n", funcname);
+					PRINT_ERROR("Adding user struct transformer function for type: %s\n", funcname);
+
+					if (!(sym_addr = dlsym(handle, symstr))) {
+						PRINT_ERROR("dlsym: %s\n", dlerror());
+						continue;
+					}
+
+					e.key = funcname;
+					e.data = sym_addr;
+
+					if (!hsearch_r(e, ENTER, &ep, &args_struct_xfm_tab)) {
+						perror("hsearch_r failed");
+						continue;
+					}
+
+				}
+
+			}
+
+			symtab++, sym_count++;
+		}
+
+	}
+
+	globfree(&rglob);
+	return 0;
+}
+
 int audit_init(int argc, char **argv, char **env)
 {
 	if (-1 == read_config(getenv("LT_DIR")))
 		return -1;
+
+	if (init_custom_handlers(&cfg) < 0) {
+	}
 
 #ifdef CONFIG_ARCH_HAVE_ARGS
 	/* -Aa */
