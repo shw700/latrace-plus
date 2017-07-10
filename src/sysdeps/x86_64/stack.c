@@ -589,9 +589,9 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			saved_arglen = data->arglen;
 			saved_totlen = data->args_totlen;
 			left = data->arglen - data->args_totlen;
-			memset(data->args_buf, 0, left);
+			memset(data->args_buf+data->args_totlen, 0, left);
 			left--;
-			result = snprintf(data->args_buf+data->args_totlen, left, "%s=", arg->name);
+			result = snprintf(data->args_buf+data->args_totlen, left, "%s = ", arg->name);
 			data->args_totlen += result;
 			left -= result;
 

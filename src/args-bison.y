@@ -37,12 +37,14 @@ static struct lt_config_shared *scfg;
 static int struct_alive = 0;
 struct lt_include *lt_args_sinc;
 
-const char *typedef_mapping_table[8][2] =
+const char *typedef_mapping_table[10][2] =
 {
 	{ "unsigned long long", "u_llong" },
 	{ "signed long long", "llong" },
 	{ "unsigned long", "u_long" },
 	{ "signed long", "long" },
+	{ "unsigned int", "u_int" },
+	{ "signed int", "int" },
 	{ "unsigned short", "u_short" },
 	{ "signed short", "short" },
 	{ "unsigned char", "u_char" },

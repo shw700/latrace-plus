@@ -36,3 +36,5 @@ Other:
 	- Calculation of in-memory/resident symbol table entries is naive/incorrect
 	- Fix hardcoded assumption of /etc/latrace.d/transformers
 	- User function transformation functions needed
+	- Special type for bool
+	- Functions that take no parameters should be distinguished as such
