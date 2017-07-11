@@ -165,13 +165,13 @@ static int process(struct lt_config_app *cfg, struct lt_process_args *pa)
 	 *   - or tty output option */
 
 	if (lt_sh(cfg, pipe)) {
-		PRINT_VERBOSE(cfg, 1, "doing pipe\n");
+		PRINT_VERBOSE(cfg, 1, "%s", "doing pipe\n");
 		FD_SET(fd_notify, &cfg_set);
 		max_fd = fd_notify;
 	}
 
 	if (cfg->output_tty) {
-		PRINT_VERBOSE(cfg, 1, "doing output tty\n");
+		PRINT_VERBOSE(cfg, 1, "%s", "doing output tty\n");
 		FD_SET(fd_tty_master, &cfg_set);
 		max_fd = MAX(fd_notify, fd_tty_master);
 	}

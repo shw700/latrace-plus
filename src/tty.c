@@ -38,7 +38,7 @@ int tty_master(struct lt_config_app *cfg)
 		return -1;
 	}
 
-	PRINT_VERBOSE(cfg, 1, "pty master opened succesfully\n");
+	PRINT_VERBOSE(cfg, 1, "%s", "pty master opened succesfully\n");
 	return mfd;
 }
 
@@ -57,7 +57,7 @@ int tty_init(struct lt_config_app *cfg, int master)
 	if (!sname)
 		longjmp(env, 1);
 
-	PRINT_VERBOSE(cfg, 1, "closing all opened descriptors\n");
+	PRINT_VERBOSE(cfg, 1, "%s", "closing all opened descriptors\n");
 	for(i = 0; i < num_files; i++)
 		close(i);
 

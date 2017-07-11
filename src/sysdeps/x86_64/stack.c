@@ -255,6 +255,7 @@ static int classificate_arg_type(struct lt_config_shared *cfg,
 		}
 
 		switch(arg->type_id) {
+		case LT_ARGS_TYPEID_BOOL:
 		case LT_ARGS_TYPEID_CHAR:
 		case LT_ARGS_TYPEID_UCHAR:
 		case LT_ARGS_TYPEID_SHORT:
@@ -572,6 +573,12 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 	    (-1 == classificate(cfg, asym)))
 		return -1;
 
+	if (asym->argcnt == 1) {
+		snprintf(data->args_buf+data->args_totlen, data->arglen-data->args_totlen, "void");
+		data->args_totlen += strlen(data->args_buf+data->args_totlen);
+		return 0;
+	}
+
 	for(i = 1; i < asym->argcnt; i++) {
 		void *pval = NULL;
 		struct lt_arg *arg = asym->args[i];
@@ -619,7 +626,8 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		}
 
 		if ((!pval) && 
-		    (arg->pointer || (LT_ARGS_DTYPE_STRUCT != arg->dtype))) {
+		    (arg->pointer || ((LT_ARGS_DTYPE_STRUCT != arg->dtype) &&
+		    (arg->type_id != LT_ARGS_TYPEID_VARARG)))) {
 			PRINT_VERBOSE(cfg, 2,
 				"THIS SHOULD NEVER HAPPEN - arg '%s %s'\n",
 				arg->type_name, arg->name);

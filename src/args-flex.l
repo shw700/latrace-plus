@@ -33,13 +33,14 @@ extern struct lt_include *lt_args_sinc;
 %}
 
 alphnum		[-0-9a-zA-Z_]
-name		([-0-9a-zA-Z_|/])+
+name		([-0-9a-zA-Z_|/])+|\.\.\.
 filename	([-0-9a-zA-Z\./_])+
+whitespace	([ \t])
 
 %x comment include
 %%
 
-"//".*			{ lt_inc_stack(lt_args_sinc)->lineno++; }
+"//".*\n		{ lt_inc_stack(lt_args_sinc)->lineno++; }
 
 "/*"			BEGIN(comment);
 <comment>[^*\n]*	/* eat anything that's not a '*' */
@@ -53,6 +54,7 @@ filename	([-0-9a-zA-Z\./_])+
 <include>\n		{ BEGIN(INITIAL); }
 <include>.		{ ; }
 
+"__attribute__"{whitespace}*"((".*"))"		{ return ATTRIBUTE; }
 "extern"		{ ; }
 "const"			{ ; }
 <<EOF>>			{ return END; }

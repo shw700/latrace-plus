@@ -175,6 +175,19 @@ static struct lt_arg args_def_pod[] = {
 	},
 	{
 		.dtype     = LT_ARGS_DTYPE_POD, 
+		.type_id   = LT_ARGS_TYPEID_BOOL,
+		.type_len  = sizeof(unsigned char),
+		.type_name = "bool",
+		.pointer   = 0,
+		.name      = "",
+		.mmbcnt    = 0,
+                .arch      = NULL,
+		.en        = NULL,
+		.args_head = NULL,
+		.args_list = { NULL, NULL }
+	},
+	{
+		.dtype     = LT_ARGS_DTYPE_POD, 
 		.type_id   = LT_ARGS_TYPEID_LLONG,
 		.type_len  = sizeof(long long),
 		.type_name = "llong",
@@ -217,6 +230,19 @@ static struct lt_arg args_def_pod[] = {
 		.type_id   = LT_ARGS_TYPEID_FLOAT,
 		.type_len  = sizeof(float),
 		.type_name = "float",
+		.pointer   = 0,
+		.name      = "",
+		.mmbcnt    = 0,
+                .arch      = NULL,
+		.en        = NULL,
+		.args_head = NULL,
+		.args_list = { NULL, NULL }
+	},
+	{
+		.dtype     = LT_ARGS_DTYPE_POD, 
+		.type_id   = LT_ARGS_TYPEID_VARARG,
+		.type_len  = sizeof(void *),
+		.type_name = "...",
 		.pointer   = 0,
 		.name      = "",
 		.mmbcnt    = 0,
@@ -1066,6 +1092,11 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 	
 	*arglen = 0;
 
+	if (arg->type_id == LT_ARGS_TYPEID_VARARG) {
+		len = snprintf(argbuf, alen, "...");
+		goto out;
+	}
+
 	if ((dspname) && 
 	    (namelen < (alen - 5 - sizeof(LT_EQUAL)))) {
 		*arglen  = sprintf(argbuf, "%s"LT_EQUAL, arg->name);
@@ -1150,6 +1181,9 @@ do {                                                                 \
 		case LT_ARGS_TYPEID_DOUBLE: ARGS_SPRINTF("%lf", double); break;
 		case LT_ARGS_TYPEID_FLOAT:  ARGS_SPRINTF("%f", float); break;
 	#undef ARGS_SPRINTF
+		case LT_ARGS_TYPEID_BOOL:
+			len = snprintf(argbuf, alen, "%s",  !*((unsigned char *) pval) ? "false" : "true");
+			break;
 		case LT_ARGS_TYPEID_CHAR:
 			if (arg->pointer) {
 

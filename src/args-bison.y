@@ -84,7 +84,7 @@ do { \
 
 %}
 
-%token NAME FILENAME STRUCT ENUM BM_ENUM TYPEDEF INCLUDE END POINTER
+%token NAME FILENAME STRUCT ENUM BM_ENUM TYPEDEF INCLUDE END POINTER ATTRIBUTE
 
 %union
 {
@@ -306,6 +306,26 @@ DEF '(' ARGS ')' ';'
 	/* force creation of the new list head */
 	$3 = NULL;
 }
+|
+DEF '(' ARGS ')' ATTRIBUTE ';'
+{
+	struct lt_arg *arg = $1;
+	size_t alen;
+	int collapsed = 0;
+
+	alen = strlen(arg->name);
+
+	if (alen && (arg->name[alen-1] == '!')) {
+		arg->name[alen-1] = 0;
+		collapsed = 1;
+	}
+
+	if (lt_args_add_sym(scfg, arg, $3, collapsed))
+		ERROR("failed to add symbol %s\n", arg->name);
+
+	/* force creation of the new list head */
+	$3 = NULL;
+}
 
 ARGS:
 ARGS ',' DEF
@@ -391,6 +411,33 @@ STRUCT NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $4, 1, 1, $5)))
+		ERROR("unknown argument type[4] - %s\n", $2);
+
+	$$ = arg;
+}
+|
+NAME
+{
+	struct lt_arg *arg;
+	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 0, 1, NULL)))
+		ERROR("unknown argument type[4] - %s\n", $1);
+
+	$$ = arg;
+}
+|
+NAME POINTER
+{
+	struct lt_arg *arg;
+	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 1, 1, NULL)))
+		ERROR("unknown argument type[2] - %s\n", $1);
+
+	$$ = arg;
+}
+|
+STRUCT NAME POINTER
+{
+	struct lt_arg *arg;
+	if (NULL == (arg = lt_args_getarg(scfg, $2, "_anon_", 1, 1, NULL)))
 		ERROR("unknown argument type[4] - %s\n", $2);
 
 	$$ = arg;
