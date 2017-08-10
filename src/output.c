@@ -93,7 +93,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	if (indent_depth && cfg->indent_sym) {
 
 		if (cfg->fmt_colors)
-			cur_color = color_table[indent_depth % sizeof(color_table)];
+			cur_color = color_table[indent_depth % (sizeof(color_table)/sizeof(color_table[0]))];
 
 		fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
 	}
@@ -161,7 +161,7 @@ int lt_out_exit(struct lt_config_shared *cfg,
 	if (indent_depth && cfg->indent_sym) {
 
 		if (cfg->fmt_colors)
-			cur_color = color_table[indent_depth % sizeof(color_table)];
+			cur_color = color_table[indent_depth % (sizeof(color_table)/sizeof(color_table[0]))];
 
 		fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
 	}

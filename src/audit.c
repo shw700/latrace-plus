@@ -153,6 +153,9 @@ static int sym_entry(const char *symname, void *ptr,
 		if (!pipe_fd)
 			pipe_fd = lt_fifo_create(&cfg, cfg.dir);
 
+		if (pipe_fd == -1)
+			return -1;
+
 		len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
 				(char*) symname, lib_to, argbuf, argdbuf);
 

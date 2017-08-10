@@ -344,6 +344,13 @@ static int process_option_val(struct lt_config_app *cfg, int idx,
 			      lt_sh(cfg, args_detailed));
 		break;
 
+	case LT_OPT_RUN_IN_GDB:
+		lt_sh(cfg, run_in_gdb) = ival;
+
+		PRINT_VERBOSE(cfg, 1, "RUN_IN_GDB %d\n",
+			      lt_sh(cfg, run_in_gdb));
+		break;
+
 	default:
 		return -1;
 	}
@@ -495,7 +502,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			{0, 0, 0, 0}
 		};
 
-		c = getopt_long(argc, argv, "+s:n:l:t:f:vhi:Bdx:ISb:cC:y:YL:po:a:N:ADVTFERq",
+		c = getopt_long(argc, argv, "+s:n:l:t:f:vhi:Bdx:ISb:cC:y:YL:po:a:N:ADVTFERqg",
 					long_options, &option_index);
 
 		if (c == -1)
@@ -657,6 +664,10 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			lt_sh(cfg, ctl_config) = 1;
 			break;
 
+		case 'g':
+			process_option_val(cfg, LT_OPT_RUN_IN_GDB, NULL, 1);
+			break;
+
 		case 'V':
 			version();
 			break;
@@ -666,7 +677,9 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 
 		default:
-			printf("unknown option '%c'", c);
+			printf("unknown option '%c'\n", c);
+			usage();
+			break;
 		} // switch (c)
 	} // while(1)
 

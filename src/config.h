@@ -95,6 +95,7 @@ enum {
 	LT_OPT_SYM_BELOW,
 	LT_OPT_SYM_NOEXIT,
 	LT_OPT_ARGS_STRING_POINTER_LENGTH,
+	LT_OPT_RUN_IN_GDB,
 };
 
 struct lt_config_opt {
@@ -143,6 +144,7 @@ struct lt_config_shared {
 	int verbose;
 	int timestamp;
 	int debug;
+	int run_in_gdb;
 	int indent_sym;
 	int indent_size;
 	int braces;

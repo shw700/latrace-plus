@@ -29,6 +29,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <sys/inotify.h>
+#include <errno.h>
 
 #include "config.h"
 
@@ -58,7 +59,7 @@ int lt_fifo_create(struct lt_config_audit *cfg, char *dir)
 	sprintf(fifo, "%s/fifo-%d", get_notify_dir(dir),
 		(pid_t) syscall(SYS_gettid));
 
-	if (-1 == mkfifo(fifo, 0666)) {
+	if ((-1 == mkfifo(fifo, 0666)) && errno != EEXIST) {
 		perror("mkfifo failed");
 		return -1;
 	}
@@ -128,7 +129,10 @@ int lt_fifo_send(struct lt_config_audit *cfg, int fd, char *buf, int len)
 	static unsigned int written = 0;
 
 	if (-1 == write(fd, buf, len)) {
-		perror("write failed");
+		char errbuf[32];
+
+		sprintf(errbuf, "write(%d,) failed:", fd);
+		perror(errbuf);
 		return -1;
 	}
 

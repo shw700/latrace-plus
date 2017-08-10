@@ -48,6 +48,8 @@ struct lt_process_args {
 	int fd_tty_master;
 };
 
+extern char **envp;
+
 static volatile int exit_flag = 0;
 
 static int store_config(struct lt_config_app *cfg, char *file)
@@ -363,6 +365,51 @@ static void run_cleanup(struct lt_config_app *cfg,
 	remove_dir(cfg, pa->dir);
 }
 
+static int run_in_gdb(const char *program, char * const *args, int start_exec)
+{
+	char **new_args, *ld_audit;
+	char ldbuf[1024];
+	size_t alen, nind, i = 0;
+	int ret;
+
+	if ((ld_audit = getenv("LD_AUDIT")) == NULL) {
+		fprintf(stderr, "Error: was expecting LD_AUDIT to be set in environment.\n");
+		errno = EINVAL;
+		return -1;
+	}
+
+	memset(ldbuf, 0, sizeof(ldbuf));
+	snprintf(ldbuf, sizeof(ldbuf)-1, "set environment LD_AUDIT=%s", ld_audit);
+
+	while (args[i])
+		i++;
+
+	nind = start_exec ? 4 : 3;
+	alen = i + nind + 1;
+
+	new_args = calloc(1, sizeof(*new_args) * (alen+1));
+	new_args[0] = "gdb";
+	new_args[1] = "-ex";
+	new_args[2] = ldbuf;
+
+	if (start_exec)
+		new_args[3] = "-ex=r";
+
+	new_args[nind] = "--args";
+
+	for (i = 0; i < alen-2; i++)
+		new_args[i+nind+1] = args[i];
+
+//	i = 0; while (new_args[i]) { printf("ARGS: %s\n", new_args[i]); i++; }
+	unsetenv("LD_AUDIT");
+//	i = 0; while (environ[i]) { printf("ENV: %s\n", environ[i]); i++; }
+
+	ret = execvp(new_args[0], new_args);
+	free(new_args);
+
+	return ret;
+}
+
 static int run_child(struct lt_config_app *cfg,
 		     struct lt_process_args *pa)
 {
@@ -389,7 +436,8 @@ static int run_child(struct lt_config_app *cfg,
 
 		PRINT_VERBOSE(cfg, 1, "executing %s\n", cfg->prog);
 
-		if (-1 == execvp(cfg->prog, cfg->arg)) {
+		if ((cfg->sh->run_in_gdb && (-1 == run_in_gdb(cfg->prog, cfg->arg, 1))) ||
+			(-1 == execvp(cfg->prog, cfg->arg))) {
 			int err = errno;
 			tty_restore(cfg);
 			printf("execve failed for \"%s\" : %s\n", 
