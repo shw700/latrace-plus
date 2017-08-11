@@ -925,8 +925,11 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 	/* Find out the enum definition if the enum 
 	   name is provided. */
-	if (enum_name)
-		arg->en = getenum(cfg, enum_name);
+	if (enum_name) {
+		if ((arg->en = getenum(cfg, enum_name)) == NULL) {
+			return NULL;
+		}
+	}
 
 	arg->name    = strdup(name);
 

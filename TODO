@@ -22,12 +22,13 @@ bugs
 	- library settings does not work properly
 	- testing, segfaults with skype (test with simple LD_AUDIT lib)
 	- test statistics counts
-	- fifo reading more inteligent
+	- fifo reading more intelligent
 	- detailed arguments buffer memory management (now fixed size)
 	- environment variables to the include path
 	- check we dont cross all the hardcoded limits
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
+	- allow last value in enum to be trailed by comma
 
 
 Other:

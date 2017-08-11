@@ -384,7 +384,7 @@ NAME NAME ENUM_REF
 	struct lt_arg *arg;
 
 	if (NULL == (arg = lt_args_getarg(scfg, $1, $2, 0, 1, $3)))
-		ERROR("unknown argument type[1] - %s\n", $1);
+		ERROR("unknown argument type[2] - %s; possibly due to enum specification of \"%s\"\n", $1, $3);
 
 	$$ = arg;
 }
@@ -393,7 +393,7 @@ NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $1, $3, 1, 1, $4)))
-		ERROR("unknown argument type[2] - %s\n", $1);
+		ERROR("unknown argument type[3] - %s\n", $1);
 
 	$$ = arg;
 }
@@ -402,7 +402,7 @@ STRUCT NAME NAME
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $3, 0, 1, NULL)))
-		ERROR("unknown argument type[3] - %s\n", $2);
+		ERROR("unknown argument type[4] - %s\n", $2);
 
 	$$ = arg;
 }
@@ -411,7 +411,7 @@ STRUCT NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $4, 1, 1, $5)))
-		ERROR("unknown argument type[4] - %s\n", $2);
+		ERROR("unknown argument type[5] - %s\n", $2);
 
 	$$ = arg;
 }
@@ -420,7 +420,7 @@ NAME
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 0, 1, NULL)))
-		ERROR("unknown argument type[4] - %s\n", $1);
+		ERROR("unknown argument type[6] - %s\n", $1);
 
 	$$ = arg;
 }
@@ -429,7 +429,7 @@ NAME POINTER
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 1, 1, NULL)))
-		ERROR("unknown argument type[2] - %s\n", $1);
+		ERROR("unknown argument type[7] - %s\n", $1);
 
 	$$ = arg;
 }
@@ -438,7 +438,17 @@ STRUCT NAME POINTER
 {
 	struct lt_arg *arg;
 	if (NULL == (arg = lt_args_getarg(scfg, $2, "_anon_", 1, 1, NULL)))
-		ERROR("unknown argument type[4] - %s\n", $2);
+		ERROR("unknown argument type[8] - %s\n", $2);
+
+	$$ = arg;
+}
+|
+NAME '=' NAME NAME
+{
+	struct lt_arg *arg;
+
+	if (NULL == (arg = lt_args_getarg(scfg, $1, $4, 0, 1, $3)))
+		ERROR("unknown argument type[9] - %s; possibly due to enum specification of \"%s\"\n", $1, $3);
 
 	$$ = arg;
 }

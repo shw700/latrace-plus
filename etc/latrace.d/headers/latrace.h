@@ -1,3 +1,5 @@
+/* arch-specific */
+#include "sysdeps/x86_64/latrace.h"
 
 /* miscelaneous functions */
 #include "misc.h"

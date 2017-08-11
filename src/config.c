@@ -581,12 +581,10 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 
 		case 'd':
 			#ifndef CONFIG_LIBERTY
-			printf("demangle support not compiled in," \
-				" liberty not found\n");
-			break;
+			return "demangle support not compiled in -liberty not found";
 			#endif
 
-			process_option_val(cfg, LT_OPT_DEMANGLE, NULL, 0);
+			process_option_val(cfg, LT_OPT_DEMANGLE, NULL, 1);
 			break;
 
 		case 'x':
