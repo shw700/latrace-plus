@@ -420,7 +420,7 @@ static int run_child(struct lt_config_app *cfg,
 
 		memset(str_audit, 0, sizeof(str_audit));
 
-		if ((cust_audit_dir = getenv("LIBLTAUDIT_PATH"))) {
+		if ((cust_audit_dir = getenv("LIBLDAUDIT_PATH"))) {
 			strncpy(str_audit, cust_audit_dir, sizeof(str_audit)-1);
 		} else { 
 			sprintf(str_audit, "%s/libltaudit.so.%s", CONFIG_LIBDIR,
