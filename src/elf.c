@@ -69,13 +69,16 @@ lookup_addr(void *addr) {
 }
 
 int
-get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize) {
+get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int debug) {
 	symbol_mapping_t *result, *rptr;
 	Elf64_Dyn *dyn = (Elf64_Dyn *)lm->l_ld;
 	Elf64_Sym *symtab = NULL;
 	void *osym = NULL;
 	char *strtab = NULL, *rstrtab;
 	size_t strtab_size = 0, syment_size = 0, rsize = 0, nsyms = 0;
+
+	if (debug)
+		fprintf(stderr, "ELF debug: base addr = %p\n", (void *)lm->l_addr);
 
 	while (dyn->d_tag != DT_NULL) {
 
@@ -88,10 +91,24 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize) {
 		else if (dyn->d_tag == DT_SYMTAB)
 			osym = symtab = (Elf64_Sym *)dyn->d_un.d_ptr;
 
-		else if (dyn->d_tag == DT_RELENT)
-			printf("relent = %lu\n", dyn->d_un.d_val);
-		else if (dyn->d_tag == DT_RELSZ)
-			printf("relsz = %lu\n", dyn->d_un.d_val);
+		if (debug) {
+			if (dyn->d_tag == DT_RELENT)
+				fprintf(stderr, "ELF debug: relent = %lu\n", dyn->d_un.d_val);
+			else if (dyn->d_tag == DT_RELSZ)
+				fprintf(stderr, "ELF debug: relsz = %lu\n", dyn->d_un.d_val);
+			else if (dyn->d_tag == DT_PLTRELSZ)
+				fprintf(stderr, "ELF debug: plt relsz = %lu\n", dyn->d_un.d_val);
+			else if (dyn->d_tag == DT_PLTGOT)
+				fprintf(stderr, "ELF debug: pltgot = %p\n", (void *)dyn->d_un.d_ptr);
+			else if (dyn->d_tag == DT_RELA)
+				fprintf(stderr, "ELF debug: rela = %p\n", (void *)dyn->d_un.d_ptr);
+			else if (dyn->d_tag == DT_REL)
+				fprintf(stderr, "ELF debug: rel = %p\n", (void *)dyn->d_un.d_ptr);
+			else if (dyn->d_tag == DT_TEXTREL)
+				fprintf(stderr, "ELF debug: textrel = %p\n", (void *)dyn->d_un.d_ptr);
+			else if (dyn->d_tag == DT_JMPREL)
+				fprintf(stderr, "ELF debug: jmprel = %p\n", (void *)dyn->d_un.d_ptr);
+		}
 
 		dyn++;
 	}
@@ -136,7 +153,7 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize) {
 			continue;
 		}
 
-		rptr->addr = symtab->st_value;
+		rptr->addr = (unsigned long)lm->l_addr + symtab->st_value;
 		rptr->name = rstrtab + symtab->st_name;
 		symtab++, rptr++;
 	}

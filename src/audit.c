@@ -278,7 +278,7 @@ unsigned int la_objopen(struct link_map *l, Lmid_t a, uintptr_t *cookie)
 	if (!name)
 		return 0;
 
-	if ((res = get_all_symbols(l, &pmap, &msize)) > 0)
+	if ((res = get_all_symbols(l, &pmap, &msize, 0)) > 0)
 		store_link_map_symbols(l, pmap, msize);
 
 	/* executable itself */

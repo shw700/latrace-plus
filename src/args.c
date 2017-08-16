@@ -1114,12 +1114,14 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 		goto out;
 	} else if (arg->type_id == LT_ARGS_TYPEID_FNPTR) {
 		void *fn = *((void **) pval);
-		char *fname;
+		const char *fname;
 
-		if ((fname = lookup_addr(fn)))
-			len = snprintf(argbuf, alen, "*fn=%s()", fname);
+		if (!fn)
+			len = snprintf(argbuf, alen, "%s=fn@NULL", arg->name);
+		else if ((fname = lookup_addr(fn)))
+			len = snprintf(argbuf, alen, "%s=fn@%s()", arg->name, fname);
 		else
-			len = snprintf(argbuf, alen, "*fn=%p",  fn);
+			len = snprintf(argbuf, alen, "%s=fn@%p", arg->name, fn);
 
 		goto out;
 	}
