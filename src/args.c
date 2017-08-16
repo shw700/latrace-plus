@@ -1288,8 +1288,18 @@ int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg, void *pval,
 	data->args_totlen += len;
 
 	if (!last) {
-		strcat(data->args_buf, ", ");
-		data->args_totlen += 2;
+		char fmtbuf[16];
+		size_t max_append;
+
+		if (cfg->fmt_colors)
+			snprintf(fmtbuf, sizeof(fmtbuf), "%s, %s", BOLD, BOLDOFF);
+		else
+			strcpy(fmtbuf, ", ");
+
+		max_append = data->args_len - data->args_totlen;
+		max_append = strlen(fmtbuf) > max_append ? max_append : strlen(fmtbuf);
+		strncat(data->args_buf, fmtbuf, max_append);
+		data->args_totlen += max_append;
 	}
 
 	return 0;

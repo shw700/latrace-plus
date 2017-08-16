@@ -611,8 +611,18 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 				data->args_totlen += strlen(data->args_buf+data->args_totlen);
 
 				if (i+1 < asym->argcnt) {
-					strcat(data->args_buf+data->args_totlen, ", ");
-					data->args_totlen += 2;
+					char fmtbuf[16];
+					size_t max_append;
+
+					if (cfg->fmt_colors)
+						snprintf(fmtbuf, sizeof(fmtbuf), "%s, %s", BOLD, BOLDOFF);
+					else
+						strcpy(fmtbuf, ", ");
+
+					max_append = data->args_len - data->args_totlen;
+					max_append = strlen(fmtbuf) > max_append ? max_append : strlen(fmtbuf);
+					strncat(data->args_buf+data->args_totlen, fmtbuf, max_append);
+					data->args_totlen += max_append;
 				}
 
 				continue;

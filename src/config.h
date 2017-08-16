@@ -413,6 +413,7 @@ do { \
 
 #define RESET   "\033[0m"
 #define BOLD	"\033[1m"
+#define BOLDOFF	"\033[22m"
 #define BLACK   "\033[30m"      /* Black */
 #define RED     "\033[31m"      /* Red */
 #define GREEN   "\033[32m"      /* Green */
