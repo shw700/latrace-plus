@@ -32,6 +32,8 @@ bugs
 
 
 Other:
+	- support pointers to undeclared structure types
+	- support for empty structs (crashes now)
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
 	- Rigid assumptions made of 64 bit ELF objects in transformer libraries
 	- Calculation of in-memory/resident symbol table entries is naive/incorrect

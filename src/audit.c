@@ -33,6 +33,7 @@
 #include <stdlib.h>
 
 #include "config.h"
+#include "elfh.h"
 
 
 extern struct lt_config_audit cfg;
@@ -266,13 +267,19 @@ unsigned int la_version(unsigned int v)
 
 unsigned int la_objopen(struct link_map *l, Lmid_t a, uintptr_t *cookie)
 {
+	symbol_mapping_t *pmap = NULL;
 	char *name = l->l_name;
+	size_t msize = 0;
+	int res;
 
 	if (!cfg.init_ok)
 		return 0;
 
 	if (!name)
 		return 0;
+
+	if ((res = get_all_symbols(l, &pmap, &msize)) > 0)
+		store_link_map_symbols(l, pmap, msize);
 
 	/* executable itself */
 	if (!(*name))

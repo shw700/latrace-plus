@@ -54,3 +54,12 @@ int latrace_struct_to_str_FILE(FILE *obj, char *buf, size_t blen);
 
 The function takes a buffer and a size of a buffer where a user-defined structure description will be left as a null-terminated string.
 The user handler should return 0 on success or -1 on failure.
+
+
+New data types:
+Variable argument lists (...) are now understood by the parser (and effectively ignored).
+The "pfn" primitive type denotes a function pointer. If the address can be resolved to a known symbol, that symbol name will be displayed; otherwise the raw function address will be displayed in hex, as per convention.
+
+Miscellaneous additions:
+gcc __attributes__ are now ignored by the parser.
+C++ style single line comments are supported.

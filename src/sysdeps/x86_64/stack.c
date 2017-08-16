@@ -627,7 +627,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 		if ((!pval) && 
 		    (arg->pointer || ((LT_ARGS_DTYPE_STRUCT != arg->dtype) &&
-		    (arg->type_id != LT_ARGS_TYPEID_VARARG)))) {
+		    (arg->type_id != LT_ARGS_TYPEID_VARARG) && (arg->type_id != LT_ARGS_TYPEID_FNPTR)))) {
 			PRINT_VERBOSE(cfg, 2,
 				"THIS SHOULD NEVER HAPPEN - arg '%s %s'\n",
 				arg->type_name, arg->name);

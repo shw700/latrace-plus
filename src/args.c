@@ -30,6 +30,7 @@
 
 #include "config.h"
 #include "lib-include.h"
+#include "elfh.h"
 
 #define LT_EQUAL           " = "
 
@@ -244,6 +245,19 @@ static struct lt_arg args_def_pod[] = {
 		.type_len  = sizeof(void *),
 		.type_name = "...",
 		.pointer   = 0,
+		.name      = "",
+		.mmbcnt    = 0,
+                .arch      = NULL,
+		.en        = NULL,
+		.args_head = NULL,
+		.args_list = { NULL, NULL }
+	},
+	{
+		.dtype     = LT_ARGS_DTYPE_POD,
+		.type_id   = LT_ARGS_TYPEID_FNPTR,
+		.type_len  = sizeof(void *),
+		.type_name = "pfn",
+		.pointer   = 1,
 		.name      = "",
 		.mmbcnt    = 0,
                 .arch      = NULL,
@@ -1097,6 +1111,16 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 
 	if (arg->type_id == LT_ARGS_TYPEID_VARARG) {
 		len = snprintf(argbuf, alen, "...");
+		goto out;
+	} else if (arg->type_id == LT_ARGS_TYPEID_FNPTR) {
+		void *fn = *((void **) pval);
+		char *fname;
+
+		if ((fname = lookup_addr(fn)))
+			len = snprintf(argbuf, alen, "*fn=%s()", fname);
+		else
+			len = snprintf(argbuf, alen, "*fn=%p",  fn);
+
 		goto out;
 	}
 

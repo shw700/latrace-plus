@@ -30,6 +30,7 @@ AUDIT_OBJS=\
 	src/objsearch.o \
 	src/stack.o \
 	src/symbol.o \
+	src/elf.o \
 	src/lib-include.o
 
 ifeq ($(CONFIG_ARCH_HAVE_ARGS),y)
