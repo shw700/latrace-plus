@@ -63,7 +63,7 @@ static int store_config(struct lt_config_app *cfg, char *file)
 	}
 
 	if (-1 == (fd = open(file, O_CREAT | O_TRUNC | O_RDWR, mode))) {
-		perror("open failed");
+		PRINT_ERROR("open failed on config file %s: %s\n", file, strerror(errno));
 		return -1;
 	}
 

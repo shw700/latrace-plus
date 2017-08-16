@@ -29,6 +29,7 @@ bugs
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- allow last value in enum to be trailed by comma
+	- latrace crash if struct transformer overrides definition of struct
 
 
 Other:

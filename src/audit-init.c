@@ -47,7 +47,7 @@ static int init_ctl_config(char *file)
 	int fd;
 
 	if (-1 == (fd = open(file, O_RDWR))) {
-		perror("open failed");
+		PRINT_ERROR("open failed on config file %s: %s\n", file, strerror(errno));
 		return -1;
 	}
 
@@ -85,7 +85,7 @@ static int read_config(char *dir)
 	sprintf(file, "%s/config", dir);
 
 	if (-1 == (fd = open(file, O_RDONLY))) {
-		perror("open failed");
+		PRINT_ERROR("open failed on config file %s: %s\n", file, strerror(errno));
 		return -1;
 	}
 
@@ -100,7 +100,7 @@ static int read_config(char *dir)
 	}
 
 	if (len != sizeof(cfg.sh_storage)) {
-		printf("config file size differs\n");
+		printf("config file size differs (expected %zu bytes)\n", sizeof(cfg.sh_storage));
 		return -1;
 	}
 
@@ -333,14 +333,16 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 					if (!(sym_addr = dlsym(handle, symstr))) {
 						PRINT_ERROR("dlsym: %s\n", dlerror());
+						symtab++, sym_count++;
 						continue;
 					}
 
-					e.key = funcname;
+					e.key = strdup(funcname);
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_struct_xfm_tab)) {
 						perror("hsearch_r failed");
+						symtab++, sym_count++;
 						continue;
 					}
 
@@ -359,7 +361,11 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 int audit_init(int argc, char **argv, char **env)
 {
-	if (-1 == read_config(getenv("LT_DIR")))
+
+	if (!getenv("LT_DIR")) {
+		PRINT_ERROR("%s", "Error: LT_DIR environment variable must be set!\n");
+		return -1;
+	} else if (-1 == read_config(getenv("LT_DIR")))
 		return -1;
 
 	if (init_custom_handlers(&cfg) < 0) {
