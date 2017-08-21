@@ -37,6 +37,7 @@
 
 struct lt_config_audit cfg;
 struct hsearch_data args_struct_xfm_tab;
+struct hsearch_data args_func_xfm_tab;
 
 
 static int init_ctl_config(char *file)
@@ -230,6 +231,11 @@ static int setup_struct_transformers(void)
 		return -1;
 	}
 
+	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_func_xfm_tab)) {
+		perror("failed to create hash table:");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -240,6 +246,7 @@ int glob_err(const char *epath, int eerrno) {
 }
 
 #define STRUCT_TRANSFORM_PREFIX	"latrace_struct_to_str_"
+#define FUNC_TRANSFORM_PREFIX	"latrace_func_to_str_"
 int init_custom_handlers(struct lt_config_audit *cfg)
 {
 	glob_t rglob;
@@ -341,6 +348,29 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_struct_xfm_tab)) {
+						perror("hsearch_r failed");
+						symtab++, sym_count++;
+						continue;
+					}
+
+				} else if (!strncmp(symstr, FUNC_TRANSFORM_PREFIX, strlen(FUNC_TRANSFORM_PREFIX))) {
+					void *sym_addr;
+					char *funcname = symstr + strlen(FUNC_TRANSFORM_PREFIX);
+					ENTRY e, *ep;
+
+					PRINT_VERBOSE(cfg, 1, "Adding user transformer function for function: %s()\n", funcname);
+					PRINT_ERROR("Adding user transformer function for function: %s()\n", funcname);
+
+					if (!(sym_addr = dlsym(handle, symstr))) {
+						PRINT_ERROR("dlsym: %s\n", dlerror());
+						symtab++, sym_count++;
+						continue;
+					}
+
+					e.key = strdup(funcname);
+					e.data = sym_addr;
+
+					if (!hsearch_r(e, ENTER, &ep, &args_func_xfm_tab)) {
 						perror("hsearch_r failed");
 						symtab++, sym_count++;
 						continue;

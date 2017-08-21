@@ -111,6 +111,7 @@ struct lt_arg {
 
 	/* custom user-defined transformer */
 	int (*latrace_custom_struct_transformer)(void *obj, char *buf, size_t blen);
+	int (*latrace_custom_func_transformer)(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 };
 
 struct lt_bitmask_value {
@@ -188,6 +189,6 @@ int lt_args_cb_struct(struct lt_config_shared *cfg, int type,
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			La_regs *regs, struct lt_args_data *data);
 int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_retval *regs, struct lt_args_data *data);
+			La_regs *iregs, La_retval *regs, struct lt_args_data *data);
 
 #endif /* ARGS_H */

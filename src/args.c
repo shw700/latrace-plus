@@ -36,7 +36,7 @@
 
 extern int errno;
 extern FILE *lt_args_in;
-extern struct hsearch_data args_struct_xfm_tab;
+extern struct hsearch_data args_struct_xfm_tab, args_func_xfm_tab;
 int  lt_args_parse();
 void lt_args__switch_to_buffer (YY_BUFFER_STATE new_buffer  );
 void lt_args__delete_buffer (YY_BUFFER_STATE b  );
@@ -904,8 +904,17 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		ENTRY e, *ep;
 
 		if ((arg = find_arg(cfg, type, 
-			args_def_pod, LT_ARGS_DEF_POD_NUM, create)))
+			args_def_pod, LT_ARGS_DEF_POD_NUM, create))) {
+
+			if (name) {
+				e.key = (char *)name;
+
+				if (hsearch_r(e, FIND, &ep, &args_func_xfm_tab))
+					arg->latrace_custom_func_transformer = (void *)ep->data;
+			}
+
 			break;
+		}
 
 		if ((arg = find_arg(cfg, type, 
 			args_def_struct, args_def_struct_cnt, create)))
@@ -1411,7 +1420,7 @@ int lt_args_sym_entry(struct lt_config_shared *cfg, struct lt_symbol *sym,
 }
 
 static int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-		La_retval *regs, char **abuf, char **adbuf)
+		La_regs *iregs, La_retval *regs, char **abuf, char **adbuf)
 {
 	struct lt_args_data data;
 	int arglen, totlen;
@@ -1446,7 +1455,7 @@ static int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 	data.args_len    = cfg->args_maxlen;
 	data.args_totlen = totlen;
 
-	return lt_stack_process_ret(cfg, asym, regs, &data);
+	return lt_stack_process_ret(cfg, asym, iregs, regs, &data);
 }
 
 int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
@@ -1458,5 +1467,5 @@ int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 	if (!asym)
 		return -1;
 
-	return getargs_ret(cfg, asym, outregs, argbuf, argdbuf);
+	return getargs_ret(cfg, asym, inregs, outregs, argbuf, argdbuf);
 }

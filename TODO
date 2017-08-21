@@ -39,5 +39,4 @@ Other:
 	- Rigid assumptions made of 64 bit ELF objects in transformer libraries
 	- Calculation of in-memory/resident symbol table entries is naive/incorrect
 	- Fix hardcoded assumption of /etc/latrace.d/transformers
-	- User function transformation functions needed
 	- Allow all type definitions to be overridden by most recent declaration

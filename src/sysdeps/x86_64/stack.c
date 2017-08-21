@@ -21,10 +21,21 @@
 
 #include "config.h"
 #include "stack.h"
+#include <stdlib.h>
+
+
+typedef struct function_call {
+	char *fn_name;
+	La_regs registers;
+	void **args;
+	size_t argcnt;
+} fn_call_t;
 
 static __thread int ass_integer;
 static __thread int ass_sse;
 static __thread int ass_memory;
+static __thread fn_call_t *xfm_call_stack = NULL;
+static __thread size_t xfm_call_stack_max = 0, xfm_call_stack_sz = 0;
 
 #define ASS_CLEANUP() \
 do { \
@@ -562,12 +573,95 @@ static void process_detailed_struct(struct lt_config_shared *cfg,
 			process_struct_arg(cfg, arg, regs, data, ret);
 	}
 }
-		
+
+static void
+enter_transformer_callstack(char *symname, La_regs *inregs, void **args, size_t argcnt)
+{
+
+	if (!xfm_call_stack_max)
+	{
+		xfm_call_stack_max = 4;
+		xfm_call_stack_sz = 0;
+		xfm_call_stack = malloc(sizeof(*xfm_call_stack) * xfm_call_stack_max);
+	} else if (xfm_call_stack_sz == xfm_call_stack_max) {
+		xfm_call_stack_max *= 2;
+		xfm_call_stack = realloc(xfm_call_stack, sizeof(*xfm_call_stack) * xfm_call_stack_max);
+	}
+
+	xfm_call_stack[xfm_call_stack_sz].fn_name = symname;
+	xfm_call_stack[xfm_call_stack_sz].args = args;
+	xfm_call_stack[xfm_call_stack_sz].argcnt = argcnt;
+	memcpy(&xfm_call_stack[xfm_call_stack_sz].registers, inregs, sizeof(*inregs));
+	xfm_call_stack_sz++;
+
+	return;
+}
+
+static int
+exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t *pargcnt)
+{
+	int i;
+
+	if (!xfm_call_stack_max || !xfm_call_stack_sz) {
+		PRINT_ERROR("%s", "Whoops: could not entry on transformer call stack.\n");
+		return -1;
+	}
+
+	for (i = xfm_call_stack_sz; i > 0; i--) {
+
+		if (strcmp(xfm_call_stack[i-1].fn_name, symname))
+			continue;
+
+		if (memcmp(&(xfm_call_stack[i-1].registers), inregs, sizeof(*inregs)))
+			continue;
+
+		*pargs = xfm_call_stack[i-1].args;
+		*pargcnt = xfm_call_stack[i-1].argcnt;
+
+		memcpy(&(xfm_call_stack[i-1]), &(xfm_call_stack[i]),
+			(sizeof(fn_call_t) * (xfm_call_stack_sz - i)));
+
+		xfm_call_stack_sz--;
+		return 0;
+	}
+
+	return -1;
+}
 
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
 			La_regs *regs, struct lt_args_data *data)
 {
 	int i;
+
+	if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
+		void **targs;
+		int tres;
+
+		if (!ARCH_GET(asym->args[LT_ARGS_RET]) &&
+		    (-1 == classificate(cfg, asym)))
+			return -1;
+
+		targs = malloc(sizeof(void *) * asym->argcnt);
+
+		for(i = 1; i < asym->argcnt; i++) {
+			void *pval = NULL;
+			struct lt_arg *arg = asym->args[i];
+
+			pval = get_value(cfg, arg, regs, 0);
+			targs[i-1] = pval;
+		}
+
+		tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(targs,
+			asym->argcnt-1, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, NULL);
+
+		enter_transformer_callstack(asym->name, regs, targs, asym->argcnt-1);
+
+		if (!tres) {
+			data->args_totlen += strlen(data->args_buf+data->args_totlen);
+			return tres;
+		}
+
+	}
 
 	if (!ARCH_GET(asym->args[LT_ARGS_RET]) &&
 	    (-1 == classificate(cfg, asym)))
@@ -655,13 +749,39 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 }
 
 int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_retval *regs, struct lt_args_data *data)
+			La_regs *iregs, La_retval *regs, struct lt_args_data *data)
 {
 	struct lt_arg *arg;
 	void *pval;
 
 	arg = asym->args[LT_ARGS_RET];
 	pval = get_value(cfg, arg, regs, 1);
+
+	if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
+		void **inargs;
+		void *retval = pval;
+		size_t inargs_size;
+		int tres;
+
+		if (exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
+			PRINT_ERROR("%s", "Error retrieving function entry arguments from transformer call stack\n");
+			inargs = NULL;
+			inargs_size = 0;
+		}
+
+		tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(inargs,
+			inargs_size, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, retval);
+
+		if (inargs)
+			free(inargs);
+
+		if (!tres) {
+			data->args_totlen += strlen(data->args_buf+data->args_totlen);
+			return tres;
+		}
+
+	}
+
 
 	lt_args_cb_arg(cfg, arg, pval, data, 1, 0);
 
