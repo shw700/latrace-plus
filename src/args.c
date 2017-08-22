@@ -1156,9 +1156,25 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 		/* If there's no enum resolved, 
 		   just display the ptr value */
 		if (!len) {
-			if (ptr)
-				len = snprintf(argbuf, alen, "%p", ptr);
-			else
+			if (ptr) {
+				const char *aname = NULL;
+				size_t off = 0;
+
+				if (cfg->resolve_syms && (aname = get_address_mapping(ptr, &off))) {
+					const char *fmt_on = "", *fmt_off = "";
+
+					if (cfg->fmt_colors) {
+						fmt_on = BOLD;
+						fmt_off = BOLDOFF;
+					}
+
+					if (off)
+						len = snprintf(argbuf, alen, "%s%s+%zu%s", fmt_on, aname, off, fmt_off);
+					else
+						len = snprintf(argbuf, alen, "%s%s%s", fmt_on, aname, fmt_off);
+				} else
+					len = snprintf(argbuf, alen, "%p", ptr);
+			} else
 				len = snprintf(argbuf, alen, "NULL");
 		}
 

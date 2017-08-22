@@ -254,12 +254,27 @@ static int process_option_val(struct lt_config_app *cfg, int idx,
 		break;
 
 	case LT_OPT_FORMATTING:
-		if (strchr(sval, 's'))
-			lt_sh(cfg, lib_short) = 1;
-		if (strchr(sval, 'c'))
-			lt_sh(cfg, fmt_colors) = 1;
-		PRINT_VERBOSE(cfg, 1, "FORMATTING %s\n",
-			      sval);
+		{
+			char *fopt = sval;
+
+			while (*fopt) {
+				if (*fopt == 's')
+					lt_sh(cfg, lib_short) = 1;
+				else if (*fopt == 'c')
+					lt_sh(cfg, fmt_colors) = 1;
+				else if (*fopt == 'r')
+					lt_sh(cfg, resolve_syms) = 1;
+				else {
+					fprintf(stderr, "Error: formatting option '%c' not supported.\n", *fopt);
+					return -1;
+				}
+
+				fopt++;
+			}
+
+			PRINT_VERBOSE(cfg, 1, "FORMATTING %s\n",
+				      sval);
+		}
 		break;
 
 	case LT_OPT_BRACES:
@@ -465,7 +480,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 	}
 
 	while (1) {
-		int c;
+		int c, optret;
 		int option_index = 0;
 		static struct option long_options[] = {
 			{"sym", required_argument, 0, 's'},
@@ -508,47 +523,49 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 		if (c == -1)
 			break;
 
+		optret = 0;
+
 		switch (c) {
 		case 'l':
 			if (strlen(optarg) >= LT_LIBS_MAXSIZE)
 				return "Maximum library string size exceeded.";
 
-			process_option_val(cfg, LT_OPT_LIBS, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_LIBS, optarg, -1);
 			break;
 
 		case 't':
 			if (strlen(optarg) >= LT_LIBS_MAXSIZE)
 				return "Maximum library string size exceeded.";
 
-			process_option_val(cfg, LT_OPT_LIBS_TO, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_LIBS_TO, optarg, -1);
 			break;
 
 		case 'f':
 			if (strlen(optarg) >= LT_LIBS_MAXSIZE)
 				return "Maximum library string size exceeded.";
 
-			process_option_val(cfg, LT_OPT_LIBS_FROM, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_LIBS_FROM, optarg, -1);
 			break;
 
 		case 's':
 			if (strlen(optarg) >= LT_SYMBOLS_MAXSIZE)
 				return "Maximum symbol string size exceeded.";
 
-			process_option_val(cfg, LT_OPT_SYM, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_SYM, optarg, -1);
 			break;
 
 		case 'n':
 			if (strlen(optarg) >= LT_SYMBOLS_MAXSIZE)
 				return "Maximum symbol string size exceeded.";
 
-			process_option_val(cfg, LT_OPT_SYM_OMIT, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_SYM_OMIT, optarg, -1);
 			break;
 
 		case 'b':
 			if (strlen(optarg) >= LT_SYMBOLS_MAXSIZE)
 				return "Maximum symbol string size exceeded.";
 
-			process_option_val(cfg, LT_OPT_SYM_BELOW, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_SYM_BELOW, optarg, -1);
 			break;
 
 		case 'v':
@@ -556,19 +573,19 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 
 		case 'S':
-			process_option_val(cfg, LT_OPT_TIMESTAMP, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_TIMESTAMP, NULL, 1);
 			break;
 
 		case 'T':
-			process_option_val(cfg, LT_OPT_HIDE_TID, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_HIDE_TID, NULL, 1);
 			break;
 
 		case 'F':
-			process_option_val(cfg, LT_OPT_FOLLOW_FORK, NULL, 0);
+			optret = process_option_val(cfg, LT_OPT_FOLLOW_FORK, NULL, 0);
 			break;
 
 		case 'E':
-			process_option_val(cfg, LT_OPT_FOLLOW_EXEC, NULL, 0);
+			optret = process_option_val(cfg, LT_OPT_FOLLOW_EXEC, NULL, 0);
 			break;
 
 		case 'i':
@@ -576,7 +593,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 
 		case 'B':
-			process_option_val(cfg, LT_OPT_BRACES, NULL, 0);
+			optret = process_option_val(cfg, LT_OPT_BRACES, NULL, 0);
 			break;
 
 		case 'd':
@@ -584,11 +601,11 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			return "demangle support not compiled in -liberty not found";
 			#endif
 
-			process_option_val(cfg, LT_OPT_DEMANGLE, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_DEMANGLE, NULL, 1);
 			break;
 
 		case 'x':
-			process_option_val(cfg, LT_OPT_FORMATTING, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_FORMATTING, optarg, -1);
 			break;
 
 		case 'I':
@@ -596,11 +613,11 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 
 		case 'y':
-			process_option_val(cfg, LT_OPT_FRAMESIZE, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_FRAMESIZE, optarg, -1);
 			break;
 
 		case 'Y':
-			process_option_val(cfg, LT_OPT_FRAMESIZE_CHECK, NULL, 0);
+			optret = process_option_val(cfg, LT_OPT_FRAMESIZE_CHECK, NULL, 0);
 			break;
 
 		case 'L':
@@ -619,7 +636,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			lt_sh(cfg, counts) = 1;
 			/* falling through */
 		case 'p':
-			process_option_val(cfg, LT_OPT_PIPE, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_PIPE, NULL, 1);
 			break;
 
 		#ifndef CONFIG_ARCH_HAVE_ARGS
@@ -630,15 +647,15 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 		#else
 		case 'a':
-			process_option_val(cfg, LT_OPT_HEADERS, optarg, -1);
+			optret = process_option_val(cfg, LT_OPT_HEADERS, optarg, -1);
 
 			/* falling through */
 		case 'A':
-			process_option_val(cfg, LT_OPT_ENABLE_ARGS, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_ENABLE_ARGS, NULL, 1);
 			break;
 
 		case 'D':
-			process_option_val(cfg, LT_OPT_DETAIL_ARGS, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_DETAIL_ARGS, NULL, 1);
 			break;
 		#endif /* CONFIG_ARCH_HAVE_ARGS */
 
@@ -663,7 +680,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 
 		case 'g':
-			process_option_val(cfg, LT_OPT_RUN_IN_GDB, NULL, 1);
+			optret = process_option_val(cfg, LT_OPT_RUN_IN_GDB, NULL, 1);
 			break;
 
 		case 'V':
@@ -679,6 +696,10 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			usage();
 			break;
 		} // switch (c)
+
+		if (optret == -1)
+			exit(EXIT_FAILURE);
+
 	} // while(1)
 
 	if (optind < argc) {

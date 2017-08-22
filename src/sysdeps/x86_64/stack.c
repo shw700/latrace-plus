@@ -769,6 +769,9 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			inargs_size = 0;
 		}
 
+		/* Special null value for functions that are declared to return type void */
+		retval = !retval ? (void *)-1 : retval;
+
 		tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(inargs,
 			inargs_size, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, retval);
 

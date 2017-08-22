@@ -151,6 +151,7 @@ struct lt_config_shared {
 	int demangle;
 	int lib_short;
 	int fmt_colors;
+	int resolve_syms;
 	int counts;
 	int pipe;
 	int hide_tid;
