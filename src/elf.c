@@ -118,6 +118,13 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 		addr_mappings[ind].size = size;
 		addr_mappings[ind].name = strdup(name);
 		addr_mapping_used++;
+	} else {
+		// For now, only permit a perfect overwrite
+		if ((addr_mappings[ind].addr == symaddr) && (addr_mappings[ind].size == size)) {
+			free(addr_mappings[ind].name);
+			addr_mappings[ind].name = strdup(name);
+		}
+
 	}
 
 	pthread_rwlock_unlock(&mapping_lock);
