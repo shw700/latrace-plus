@@ -151,7 +151,8 @@ remove_address_mapping(void *symaddr, size_t size, const char *hint) {
 	} else {
 
 		// Freeing the whole thing or part of it?
-		if ((addr_mappings[ind].addr == caddr) && (size == addr_mappings[ind].size)) {
+		// Free the whole thing if our size requests match, or if size==0 was specified
+		if ((addr_mappings[ind].addr == caddr) && ((size == addr_mappings[ind].size) || !size)) {
 			free(addr_mappings[ind].name);
 			memmove(&addr_mappings[ind], &addr_mappings[ind+1], sizeof(addr_mappings[0]) * (addr_mapping_used-(ind+1)));
 			addr_mapping_used--;
