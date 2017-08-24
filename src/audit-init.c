@@ -231,7 +231,7 @@ int glob_err(const char *epath, int eerrno) {
 #define FUNC_TRANSFORM_PREFIX	"latrace_func_to_str_"
 int init_custom_handlers(struct lt_config_audit *cfg)
 {
-	static char globdir[sizeof(LT_CONF_HEADERS_DIR)+8];
+	static char globdir[sizeof(LT_CONF_TRANSFORMERS_DIR)+8];
 	glob_t rglob;
 	size_t i;
 	int ret;
@@ -242,7 +242,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 	}
 
 	if (!globdir[0])
-		snprintf(globdir, sizeof(globdir), "%s/*.so", LT_CONF_HEADERS_DIR);
+		snprintf(globdir, sizeof(globdir), "%s/*.so", LT_CONF_TRANSFORMERS_DIR);
 
 	ret = glob(globdir, GLOB_ERR, glob_err, &rglob);
 
