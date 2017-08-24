@@ -160,10 +160,11 @@ static int get_names(struct lt_config_audit *cfg, char *names, char **ptr)
 	return cnt;
 }
 
-static size_t get_symtab_size(const char *filename)
+static size_t get_symtab_size(const char *filename, size_t *strtab_size)
 {
 	Elf *elf;
 	int fd;
+	size_t sym_count;
 
 	if ((fd = open(filename, O_RDONLY)) < 0) {
 		perror("open");
@@ -185,41 +186,22 @@ static size_t get_symtab_size(const char *filename)
 
 	Elf_Scn *section = elf_getscn(elf, 0);
 
+	*strtab_size = 0;
+
 	while (section) {
 		GElf_Shdr shdr;
 		gelf_getshdr(section, &shdr);
 
-		if (shdr.sh_type == SHT_SYMTAB) {
-			Elf_Data *data;
-			size_t i, sym_count;
-
+		if (shdr.sh_type == SHT_STRTAB)
+			*strtab_size = shdr.sh_size;
+		else if (shdr.sh_type == SHT_SYMTAB)
 			sym_count = shdr.sh_size / shdr.sh_entsize;
-			data = elf_getdata(section, NULL);
-
-			for (i = 0; i < (shdr.sh_size / shdr.sh_entsize); i++) {
-			        GElf_Sym sym;
-			        gelf_getsym(data, i, &sym);
-
-				if (!sym.st_name || ELF64_ST_TYPE(sym.st_info) > STT_FUNC)
-					sym_count--;
-				else {
-/*			        PRINT_ERROR("strname %s\n", elf_strptr(elf, shdr.sh_link, sym.st_name));
-				PRINT_ERROR("name = %u, hehe index = %d, value = %lx, size = %lu, type = %d\n", sym.st_name, sym.st_shndx, sym.st_value, sym.st_size, ELF64_ST_TYPE(sym.st_info));
-				PRINT_ERROR("bind = %d, type = %d\n", ELF64_ST_BIND(sym.st_info), ELF64_ST_TYPE(sym.st_info)); */
-				}
-
-			}
-
-
-			close(fd);
-			return sym_count;
-		}
 
 		section = elf_nextscn(elf, section);
 	}
 
 	close(fd);
-	return 0;
+	return sym_count;
 }
 
 
@@ -249,6 +231,7 @@ int glob_err(const char *epath, int eerrno) {
 #define FUNC_TRANSFORM_PREFIX	"latrace_func_to_str_"
 int init_custom_handlers(struct lt_config_audit *cfg)
 {
+	static char globdir[sizeof(LT_CONF_HEADERS_DIR)+8];
 	glob_t rglob;
 	size_t i;
 	int ret;
@@ -258,7 +241,10 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 		return -1;
 	}
 
-	ret = glob("/etc/latrace.d/transformers/*.so", GLOB_ERR, glob_err, &rglob);
+	if (!globdir[0])
+		snprintf(globdir, sizeof(globdir), "%s/*.so", LT_CONF_HEADERS_DIR);
+
+	ret = glob(globdir, GLOB_ERR, glob_err, &rglob);
 
 	if (ret != 0 && ret != GLOB_NOMATCH) {
 		PRINT_ERROR("Unable to read transformers libraries directory: %s\n", strerror(errno));
@@ -271,7 +257,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 		Elf64_Sym *symtab = NULL;
 		void *handle;
 		char *lpath = rglob.gl_pathv[i], *strtab = NULL, *symstr;
-		size_t symtab_size, sym_count = 0;
+		size_t symtab_size, strtab_size, sym_count = 0;
 
 		PRINT_VERBOSE(cfg, 1, "Checking user-supplied transformer library: %s\n", lpath);
 
@@ -321,10 +307,12 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 			continue;
 		}
 
-		symtab_size = get_symtab_size(lpath);
+		symtab_size = get_symtab_size(lpath, &strtab_size);
 		PRINT_VERBOSE(cfg, 2, "In-memory symtab size of %s: %zu entries\n", lpath, symtab_size);
 
 		while (sym_count < symtab_size) {
+			if (symtab->st_name >= strtab_size)
+				break;
 
 			if (ELF64_ST_TYPE(symtab->st_info) == STT_FUNC) {
 				symstr = strtab + symtab->st_name;

@@ -729,6 +729,17 @@ int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 	PRINT_VERBOSE(cfg, 3, "struct [%s] type %d\n",
 			sarg.type_name, sarg.type_id);
 
+	/* empty struct pass-through */
+	if (!h) {
+		if (!(h = (struct lt_list_head*) malloc(sizeof(*h)))) {
+			perror("malloc failed");
+			return -1;
+		}
+
+		lt_init_list_head(h);
+		sarg.args_head = h;
+	}
+
 	lt_list_for_each_entry(arg, sarg.args_head, args_list) {
 
 		PRINT_VERBOSE(cfg, 3, "\t %s %s %u\n",

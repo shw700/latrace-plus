@@ -35,6 +35,7 @@ void lt_args_error(const char *m);
 
 static struct lt_config_shared *scfg;
 static int struct_alive = 0;
+static int struct_empty = 1;
 struct lt_include *lt_args_sinc;
 
 const char *typedef_mapping_table[10][2] =
@@ -133,7 +134,16 @@ entry END
 struct_def:
 STRUCT NAME '{' STRUCT_DEF '}' ';'
 {
-	switch(lt_args_add_struct(scfg, $2, $4)) {
+	int ret;
+
+	if (struct_empty)
+		ret = lt_args_add_struct(scfg, $2, NULL);
+	else
+		ret = lt_args_add_struct(scfg, $2, $4);
+
+	struct_empty = 1;
+
+	switch(ret) {
 	case -1:
 		ERROR("failed to add struct %s\n", $2);
 	case 1:
@@ -155,6 +165,7 @@ STRUCT_DEF DEF ';'
 
 	lt_list_add_tail(&def->args_list, h);
 	$$ = h;
+	struct_empty = 0;
 }
 | /* left blank intentionally,
      XXX this could be done like the args_def, but user needs to be 
