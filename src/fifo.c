@@ -180,7 +180,7 @@ int lt_fifo_recv(struct lt_config_app *cfg, struct lt_thread *t, void *buf,
 
 int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 			struct timeval *tv, char *symname, char *libto,
-			char *arg, char *argd)
+			char *arg, char *argd, int collapsed)
 {
 	struct lt_fifo_msym *m = (struct lt_fifo_msym*) buf;
 	int len_data, len = sizeof(struct lt_fifo_msym);
@@ -191,6 +191,7 @@ int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 	m->h.tv = *tv;
 
 	m->sym = 0;
+	m->collapsed = collapsed;
 	m->lib = strlen(symname);
 	m->arg = m->lib + strlen(libto) + 1;
 	m->argd = m->arg + strlen(arg) + 1;

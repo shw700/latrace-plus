@@ -33,6 +33,25 @@
 #include "audit.h"
 #include "list.h"
 
+#define TRANSFORMER_CRASH_PROTECTION 1
+
+#ifdef TRANSFORMER_CRASH_PROTECTION
+#include <signal.h>
+#include <setjmp.h>
+#endif
+
+#define CODE_LOC_LA_TRANSFORMER	1
+#define CODE_LOC_LA_VERSION	10
+#define CODE_LOC_LA_OBJOPEN	11
+#define CODE_LOC_LA_SYMBIND	12
+#define CODE_LOC_LA_ACTIVITY	13
+#define CODE_LOC_LA_OBJSEARCH	14
+#define CODE_LOC_LA_PREINIT	15
+#define CODE_LOC_LA_OBJCLOSE	16
+#define CODE_LOC_LA_SYMBIND_NATIVE	17
+#define CODE_LOC_LA_PLTENTER	18
+#define CODE_LOC_LA_PLTEXIT	19
+
 #ifdef CONFIG_ARCH_HAVE_ARGS
 #include "args.h"
 #endif
@@ -269,6 +288,12 @@ struct lt_fifo_mbase {
 	int len; /* the rest of the message size */
 };
 
+#define COLLAPSED_NONE        0
+#define COLLAPSED_BASIC	      1
+#define COLLAPSED_TERSE       2
+#define COLLAPSED_BARE        3
+#define COLLAPSED_NESTED      16
+
 /* symbol message */
 struct lt_fifo_msym {
 	struct lt_fifo_mbase h;
@@ -277,6 +302,7 @@ struct lt_fifo_msym {
 	int lib;
 	int arg;
 	int argd;
+	int collapsed;
 	char data[0];
 };
 
@@ -341,7 +367,7 @@ int lt_fifo_recv(struct lt_config_app *cfg, struct lt_thread *t,
 		void *buf, int bufsize);
 int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 			struct timeval *tv, char *symname, char *libto,
-			char *arg, char *argd);
+			char *arg, char *argd, int collapsed);
 
 /* counts */
 int lt_stats_init(struct lt_config_app *cfg);
@@ -357,11 +383,11 @@ struct lt_thread *lt_thread_next(struct lt_config_app *cfg);
 
 /* output */
 int lt_out_entry(struct lt_config_shared *cfg, struct timeval *tv,
-		pid_t tid, int indent_depth,
+		pid_t tid, int indent_depth, int collapsed,
 		const char *symname, char *lib_to,
 		char *argbuf, char *argdbuf);
 int lt_out_exit(struct lt_config_shared *cfg, struct timeval *tv,
-		pid_t tid, int indent_depth,
+		pid_t tid, int indent_depth, int collapsed,
 		const char *symname, char *lib_to,
 		char *argbuf, char *argdbuf);
 

@@ -218,6 +218,13 @@ NAME
 	if (NULL == ($$ = lt_args_get_enum(scfg, $1, NULL)))
 		ERROR("failed to add enum[3] '%s = undef'\n", $1);
 }
+| EMPTY_COMMA
+{
+}
+
+
+EMPTY_COMMA:
+ /* empty */
 
 
 /* bitmasked enum definitions */
@@ -306,9 +313,21 @@ DEF '(' ARGS ')' ';'
 
 	alen = strlen(arg->name);
 
-	if (alen && (arg->name[alen-1] == '!')) {
-		arg->name[alen-1] = 0;
-		collapsed = 1;
+	if (alen) {
+		switch(arg->name[alen-1]) {
+			case '!':
+				collapsed = COLLAPSED_BASIC;
+				break;
+			case '~':
+				collapsed = COLLAPSED_TERSE;
+				break;
+			case '^':
+				collapsed = COLLAPSED_BARE;
+				break;
+		}
+
+		if (collapsed)
+			arg->name[alen-1] = 0;
 	}
 
 	if (lt_args_add_sym(scfg, arg, $3, collapsed))
@@ -326,9 +345,21 @@ DEF '(' ARGS ')' ATTRIBUTE ';'
 
 	alen = strlen(arg->name);
 
-	if (alen && (arg->name[alen-1] == '!')) {
-		arg->name[alen-1] = 0;
-		collapsed = 1;
+	if (alen) {
+		switch(arg->name[alen-1]) {
+			case '!':
+				collapsed = COLLAPSED_BASIC;
+				break;
+			case '~':
+				collapsed = COLLAPSED_TERSE;
+				break;
+			case '^':
+				collapsed = COLLAPSED_BARE;
+				break;
+		}
+
+		if (collapsed)
+			arg->name[alen-1] = 0;
 	}
 
 	if (lt_args_add_sym(scfg, arg, $3, collapsed))

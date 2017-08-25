@@ -75,12 +75,19 @@ char *color_table[6] = { RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN };
 
 int lt_out_entry(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
-			int indent_depth,
+			int indent_depth, int collapsed,
 			const char *symname, char *lib_to,
 			char *argbuf, char *argdbuf)
 {
 	const char *cur_color = NULL;
+	const char *end_line = "{\n";
 	int demangled = 0;
+
+	if (collapsed == COLLAPSED_NESTED) {
+		fprintf(cfg->fout, "-> %s()", symname);
+		fflush(NULL);
+		return 0;
+	}
 
 	if (cfg->timestamp && tv)
 		PRINT_TIME(tv);
@@ -109,18 +116,23 @@ int lt_out_entry(struct lt_config_shared *cfg,
 			lib_to = ++rptr;
 	}
 
+	if (collapsed == COLLAPSED_BARE)
+		end_line = "";
+	else if (collapsed == COLLAPSED_TERSE)
+		end_line = "";
+
 	/* Print the symbol and arguments. */
 	if (cur_color) {
 		if (*argbuf)
-			fprintf(cfg->fout, "%s%s%s%s(%s%s%s) [%s] {\n",
-				BOLD, cur_color, symname, RESET, cur_color, argbuf, RESET, lib_to);
+			fprintf(cfg->fout, "%s%s%s%s(%s%s%s) [%s] %s",
+				BOLD, cur_color, symname, RESET, cur_color, argbuf, RESET, lib_to, end_line);
 		else
 			fprintf(cfg->fout, "%s%s%s [%s] %c\n", 
 						cur_color, symname, RESET, lib_to,
 						cfg->braces ? '{' : ' ');
 	} else {
 		if (*argbuf)
-			fprintf(cfg->fout, "%s(%s) [%s] {\n", symname, argbuf, lib_to);
+			fprintf(cfg->fout, "%s(%s) [%s] %s", symname, argbuf, lib_to, end_line);
 		else
 			fprintf(cfg->fout, "%s [%s] %c\n", 
 						symname, lib_to,
@@ -140,7 +152,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 
 int lt_out_exit(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
-			int indent_depth,
+			int indent_depth, int collapsed,
 			const char *symname, char *lib_to,
 			char *argbuf, char *argdbuf)
 {
@@ -154,7 +166,7 @@ int lt_out_exit(struct lt_config_shared *cfg,
 		PRINT_TIME(tv);
 
 	/* Print thread ID */
-	if (!cfg->hide_tid)
+	if ((!cfg->hide_tid) && (collapsed <= COLLAPSED_BASIC))
 		PRINT_TID(tid);
 
 	/* Print indentation. */
@@ -163,7 +175,8 @@ int lt_out_exit(struct lt_config_shared *cfg,
 		if (cfg->fmt_colors)
 			cur_color = color_table[indent_depth % (sizeof(color_table)/sizeof(color_table[0]))];
 
-		fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
+		if (collapsed <= COLLAPSED_BASIC)
+			fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
 	}
 
 	/* We got here, because we have '-B' option enabled. */
@@ -177,10 +190,17 @@ int lt_out_exit(struct lt_config_shared *cfg,
 		DEMANGLE(symname, demangled);
 
 	/* Print the symbol and arguments. */
-	if (cur_color)
-		fprintf(cfg->fout, "} %s%s%s%s%s\n", BOLD, cur_color, symname, RESET, argbuf);
-	else
-		fprintf(cfg->fout, "} %s%s\n", symname, argbuf);
+	if (collapsed <= COLLAPSED_BASIC) {
+		if (cur_color)
+			fprintf(cfg->fout, "} %s%s%s%s%s\n", BOLD, cur_color, symname, RESET, argbuf);
+		else
+			fprintf(cfg->fout, "} %s%s\n", symname, argbuf);
+	} else if (collapsed >= COLLAPSED_TERSE) {
+		if (cur_color)
+			fprintf(cfg->fout, "%s%s%s%s\n", BOLD, cur_color, argbuf, RESET);
+		else
+			fprintf(cfg->fout, "%s\n", argbuf);
+	}
 
 	if (demangled)
 		free((char*) symname);

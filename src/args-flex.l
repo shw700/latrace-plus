@@ -29,6 +29,8 @@
 #include "lib-include.h"
 
 extern struct lt_include *lt_args_sinc;
+char *got_filename = NULL;
+int launch_preprocessor = 0;
 
 %}
 
@@ -39,8 +41,17 @@ whitespace	([ \t])
 
 %x comment include
 %%
+ /* We need to delay return of the preprocessor filename because our grammar parser
+    tries to read in the next file's contents before it has transitioned out of the
+    include state. */
+	if (launch_preprocessor) {
+		got_filename = NULL;
+		launch_preprocessor = 0;
+		BEGIN(INITIAL);
+		return '"';
+	}
 
-"//".*\n		{ lt_inc_stack(lt_args_sinc)->lineno++; }
+"//".*\n		{ lt_inc_stack(lt_args_sinc)->lineno++; BEGIN(INITIAL); }
 
 "/*"			BEGIN(comment);
 <comment>[^*\n]*	/* eat anything that's not a '*' */
@@ -49,9 +60,15 @@ whitespace	([ \t])
 <comment>"*"+"/"	BEGIN(INITIAL);
 
 "#include"		{ BEGIN(include); return INCLUDE; }
-<include>{filename}	{ lt_args_lval.s = strdup(lt_args_text); return FILENAME; }
-<include>"\""		{ return '"'; }
-<include>\n		{ BEGIN(INITIAL); }
+<include>{filename}	{ got_filename = strdup(lt_args_text); }
+<include>"\""		{ if (!got_filename) return '"'; }
+<include>\n		{ if (!got_filename) { BEGIN(INITIAL); }
+			 else {
+				launch_preprocessor = 1;
+				lt_args_lval.s = got_filename;
+				return FILENAME;
+			}
+			}
 <include>.		{ ; }
 
 "__attribute__"{whitespace}*"((".*"))"		{ return ATTRIBUTE; }
@@ -62,7 +79,7 @@ whitespace	([ \t])
 "enum"			{ return ENUM; }
 "bm_enum"		{ return BM_ENUM; }
 "typedef"		{ return TYPEDEF; }
-{name}!?		{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
+{name}[!~^]?		{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
 "\*"+			{ return POINTER; }
 ")"			{ return ')'; }
 "("			{ return '('; }

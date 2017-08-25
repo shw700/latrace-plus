@@ -241,6 +241,13 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 		return -1;
 	}
 
+	#ifdef TRANSFORMER_CRASH_PROTECTION
+	if (setup_crash_handlers() < 0) {
+		PRINT_ERROR("%s", "Error setting up transformer crash protection\n");
+		return -1;
+	}
+	#endif
+
 	if (!globdir[0])
 		snprintf(globdir, sizeof(globdir), "%s/*.so", LT_CONF_TRANSFORMERS_DIR);
 

@@ -102,4 +102,6 @@
 # define int_retval lrv_reg[0]
 #endif
 
+int setup_crash_handlers(void);
+
 #endif // !AUDIT_H

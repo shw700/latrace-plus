@@ -36,6 +36,11 @@ static __thread int ass_sse;
 static __thread int ass_memory;
 static __thread fn_call_t *xfm_call_stack = NULL;
 static __thread size_t xfm_call_stack_max = 0, xfm_call_stack_sz = 0;
+extern __thread char *fault_reason;
+#ifdef TRANSFORMER_CRASH_PROTECTION
+extern __thread jmp_buf crash_insurance;
+extern __thread int jmp_set;
+#endif
 
 #define ASS_CLEANUP() \
 do { \
@@ -603,7 +608,7 @@ exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t
 	int i;
 
 	if (!xfm_call_stack_max || !xfm_call_stack_sz) {
-		PRINT_ERROR("%s", "Whoops: could not entry on transformer call stack.\n");
+		PRINT_ERROR("%s", "Whoops: could not find entry on transformer call stack.\n");
 		return -1;
 	}
 
@@ -651,14 +656,29 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			targs[i-1] = pval;
 		}
 
-		tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(targs,
-			asym->argcnt-1, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, NULL);
+		#ifdef TRANSFORMER_CRASH_PROTECTION
+		jmp_set = (sigsetjmp(crash_insurance, 1) == 0) ? CODE_LOC_LA_TRANSFORMER : 0;
+		#endif
 
-		enter_transformer_callstack(asym->name, regs, targs, asym->argcnt-1);
+		if (fault_reason) {
+			PRINT_ERROR("Error: caught fatal condition in custom func transformer entry for %s: %s\n",
+				asym->name, fault_reason);
+			fault_reason = NULL;
+		} else {
+			tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(targs,
+				asym->argcnt-1, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, NULL);
 
-		if (!tres) {
-			data->args_totlen += strlen(data->args_buf+data->args_totlen);
-			return tres;
+			#ifdef TRANSFORMER_CRASH_PROTECTION
+			jmp_set = 0;
+			#endif
+
+			enter_transformer_callstack(asym->name, regs, targs, asym->argcnt-1);
+
+			if (!tres) {
+				data->args_totlen += strlen(data->args_buf+data->args_totlen);
+				return tres;
+			}
+
 		}
 
 	}
@@ -699,32 +719,47 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			if (i+1 < asym->argcnt)
 				left -= 2;
 
-			result = arg->latrace_custom_struct_transformer(pvald, data->args_buf+data->args_totlen, left);
+			#ifdef TRANSFORMER_CRASH_PROTECTION
+			jmp_set = (sigsetjmp(crash_insurance, 1) == 0) ? CODE_LOC_LA_TRANSFORMER : 0;
+			#endif
 
-			if (!result) {
-				data->args_totlen += strlen(data->args_buf+data->args_totlen);
+			if (fault_reason) {
+				fprintf(stderr, "Error: caught fatal condition in custom func transformer entry for %s: %s\n",
+					asym->name, fault_reason);
+				fault_reason = NULL;
+			} else {
+				result = arg->latrace_custom_struct_transformer(pvald, data->args_buf+data->args_totlen, left);
 
-				if (i+1 < asym->argcnt) {
-					char fmtbuf[16];
-					size_t max_append;
+				#ifdef TRANSFORMER_CRASH_PROTECTION
+				jmp_set = 0;
+				#endif
 
-					if (cfg->fmt_colors)
-						snprintf(fmtbuf, sizeof(fmtbuf), "%s, %s", BOLD, BOLDOFF);
-					else
-						strcpy(fmtbuf, ", ");
+				if (!result) {
+					data->args_totlen += strlen(data->args_buf+data->args_totlen);
 
-					max_append = data->args_len - data->args_totlen;
-					max_append = strlen(fmtbuf) > max_append ? max_append : strlen(fmtbuf);
-					strncat(data->args_buf+data->args_totlen, fmtbuf, max_append);
-					data->args_totlen += max_append;
+					if (i+1 < asym->argcnt) {
+						char fmtbuf[16];
+						size_t max_append;
+
+						if (cfg->fmt_colors)
+							snprintf(fmtbuf, sizeof(fmtbuf), "%s, %s", BOLD, BOLDOFF);
+						else
+							strcpy(fmtbuf, ", ");
+
+						max_append = data->args_len - data->args_totlen;
+						max_append = strlen(fmtbuf) > max_append ? max_append : strlen(fmtbuf);
+						strncat(data->args_buf+data->args_totlen, fmtbuf, max_append);
+						data->args_totlen += max_append;
+					}
+
+					continue;
+				} else {
+					data->args_buf = saved_args_buf;
+					data->arglen = saved_arglen;
+					data->args_totlen = saved_totlen;
+					memset(data->args_buf+data->args_totlen, 0, data->arglen-data->args_totlen);
 				}
 
-				continue;
-			} else {
-				data->args_buf = saved_args_buf;
-				data->arglen = saved_arglen;
-				data->args_totlen = saved_totlen;
-				memset(data->args_buf+data->args_totlen, 0, data->arglen-data->args_totlen);
 			}
 
 		}
@@ -772,15 +807,30 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		/* Special null value for functions that are declared to return type void */
 		retval = !retval ? (void *)-1 : retval;
 
-		tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(inargs,
-			inargs_size, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, retval);
+		#ifdef TRANSFORMER_CRASH_PROTECTION
+		jmp_set = (sigsetjmp(crash_insurance, 1) == 0) ? CODE_LOC_LA_TRANSFORMER : 0;
+		#endif
 
-		if (inargs)
-			free(inargs);
+		if (fault_reason) {
+			fprintf(stderr, "Error: caught fatal condition in custom func transformer entry for %s: %s\n",
+				asym->name, fault_reason);
+			fault_reason = NULL;
+		} else {
+			tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(inargs,
+				inargs_size, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, retval);
 
-		if (!tres) {
-			data->args_totlen += strlen(data->args_buf+data->args_totlen);
-			return tres;
+			#ifdef TRANSFORMER_CRASH_PROTECTION
+			jmp_set = 0;
+			#endif
+
+			if (inargs)
+				free(inargs);
+
+			if (!tres) {
+				data->args_totlen += strlen(data->args_buf+data->args_totlen);
+				return tres;
+			}
+
 		}
 
 	}

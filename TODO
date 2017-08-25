@@ -9,11 +9,8 @@ for 0.5.12
 	- config - arrays in structures
 	- variable length argument output (printf like)
 	- config - long/float/double support
-	- config - X symbols config file 
-	- runtime configuration control
-	- segfault handling support (libSegFault.so loading support)
+	- * segfault handling support (libSegFault.so loading support)
 	- statistics for recursive calls
-	- automated tests
 	- other LD_AUDIT interface functions utilization
 	- statistics check
 
@@ -28,7 +25,6 @@ bugs
 	- check we dont cross all the hardcoded limits
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
-	- allow last value in enum to be trailed by comma
 	- latrace crash if struct transformer overrides definition of struct
 
 
@@ -37,3 +33,7 @@ Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
 	- Rigid assumptions made of 64 bit ELF objects in transformer libraries
 	- Allow all type definitions to be overridden by most recent declaration
+	- Suppress identical output lines?
+	- new library loads should trigger symbol load
+	- funcs need user "hooks" for functionality that doesn't format data for display - in addition to transformers
+	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten

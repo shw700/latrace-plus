@@ -1205,6 +1205,8 @@ do {                                                                 \
 		ARGS_SPRINTF("0%o", unsigned int);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "x"))) {
 		ARGS_SPRINTF("0x%lx", unsigned long);
+	} else if (arg->fmt && (!strcmp(arg->fmt, "p"))) {
+		ARGS_SPRINTF("%p", unsigned long);
 	} else if (arg->fmt && (strchr(arg->fmt, 'b'))) {
 		char *tok;
 #define DEFAULT_BINARY_WIDTH 4

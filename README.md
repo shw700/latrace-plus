@@ -27,6 +27,8 @@ The "/" switch can be used at the end of a regular function variable declaration
 
 `/#b`	Binary string dump of # bytes length
 
+`/p`	Print memory address
+
 
 The "/" switch at the end of a function variable declaration can be used as such, when displayed in conjunction with a bitmasked value:
 
@@ -38,15 +40,22 @@ The "/" switch at the end of a function variable declaration can be used as such
 
 `/u`	Force unsigned decimal representation
 
-Individual function sub-routine expansion can also be suppressed by appending an exclamation mark after the function name in its declaration.
+Individual function sub-routine expansion can also be suppressed by appending one of a few special characters to the function name in its declaration.
+
+The characters can be !, ~, or ^
 
 For example: `void ERR_load_crypto_strings!(void);`
 
-
 results in the suppression of the expansion of all subroutines called internally by the ERR_load_crypto_strings() function.
 
+Use of ~ results in terse single line expansion (child function names are displayed, but no more data beyond that).
 
-Other new options:
+^ is bare mode, resulting in a function's return value being displayed on the same output line as its invocation, with no information about nested function calls.
+
+*Please note that no custom user transformer functions are called on functions whose returns have been collapsed.*
+
+
+*Other new options:*
 
 `latrace -x s`		Display library names in short format (without absolute path prefix)
 
@@ -57,7 +66,7 @@ Other new options:
 
 
 
-User transformer libraries:
+*User transformer libraries:*
 
 Shared libraries with transformers should be dropped into /etc/latrace.d/transformers, where they will be automatically loaded.
 
@@ -72,6 +81,8 @@ For example, imagine this module being used in conjunction with the stdio librar
 The function takes a buffer and a size of a buffer where a user-defined structure description will be left as a null-terminated string.
 
 The user handler should return 0 on success or -1 on failure.
+
+Very basic support for catching program faults has been added. The underlying assumption is that if a transformer has generated something like a segmentation violation, it is likely due to READING a bad memory address, and not because of any resulting corruption. This is why it will often be safe in our case to resume program execution rather than terminate gracefully.
 
 
 *New data types:*
