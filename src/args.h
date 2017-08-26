@@ -112,6 +112,7 @@ struct lt_arg {
 	/* custom user-defined transformer */
 	int (*latrace_custom_struct_transformer)(void *obj, char *buf, size_t blen);
 	int (*latrace_custom_func_transformer)(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
+	void (*latrace_custom_func_intercept)(void **args, size_t argscnt, void *retval);
 };
 
 struct lt_bitmask_value {

@@ -38,6 +38,7 @@
 struct lt_config_audit cfg;
 struct hsearch_data args_struct_xfm_tab;
 struct hsearch_data args_func_xfm_tab;
+struct hsearch_data args_func_intercept_tab;
 
 
 static int init_ctl_config(char *file)
@@ -205,7 +206,7 @@ static size_t get_symtab_size(const char *filename, size_t *strtab_size)
 }
 
 
-static int setup_struct_transformers(void)
+static int setup_user_data_handlers(void)
 {
 
 	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_struct_xfm_tab)) {
@@ -214,6 +215,11 @@ static int setup_struct_transformers(void)
 	}
 
 	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_func_xfm_tab)) {
+		perror("failed to create hash table:");
+		return -1;
+	}
+
+	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_func_intercept_tab)) {
 		perror("failed to create hash table:");
 		return -1;
 	}
@@ -229,6 +235,7 @@ int glob_err(const char *epath, int eerrno) {
 
 #define STRUCT_TRANSFORM_PREFIX	"latrace_struct_to_str_"
 #define FUNC_TRANSFORM_PREFIX	"latrace_func_to_str_"
+#define FUNC_INTERCEPT_PREFIX	"latrace_func_intercept_"
 int init_custom_handlers(struct lt_config_audit *cfg)
 {
 	static char globdir[sizeof(LT_CONF_TRANSFORMERS_DIR)+8];
@@ -236,7 +243,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 	size_t i;
 	int ret;
 
-	if (setup_struct_transformers() < 0) {
+	if (setup_user_data_handlers() < 0) {
 		PRINT_ERROR("%s", "Unexpected error setting up function transformers table");
 		return -1;
 	}
@@ -366,6 +373,29 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_xfm_tab)) {
+						perror("hsearch_r failed");
+						symtab++, sym_count++;
+						continue;
+					}
+
+				} else if (!strncmp(symstr, FUNC_INTERCEPT_PREFIX, strlen(FUNC_INTERCEPT_PREFIX))) {
+					void *sym_addr;
+					char *funcname = symstr + strlen(FUNC_INTERCEPT_PREFIX);
+					ENTRY e, *ep;
+
+					PRINT_VERBOSE(cfg, 1, "Adding user intercept function for function: %s()\n", funcname);
+					PRINT_ERROR("Adding user intercept function for function: %s()\n", funcname);
+
+					if (!(sym_addr = dlsym(handle, symstr))) {
+						PRINT_ERROR("dlsym: %s\n", dlerror());
+						symtab++, sym_count++;
+						continue;
+					}
+
+					e.key = strdup(funcname);
+					e.data = sym_addr;
+
+					if (!hsearch_r(e, ENTER, &ep, &args_func_intercept_tab)) {
 						perror("hsearch_r failed");
 						symtab++, sym_count++;
 						continue;

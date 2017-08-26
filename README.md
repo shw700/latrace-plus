@@ -96,3 +96,16 @@ The "*pfn*" primitive type denotes a function pointer. If the address can be res
 gcc __attributes__ are now ignored by the parser.
 
 C++ style single line comments are supported.
+
+
+
+* Trying latrace out locally *
+
+`autoconf && ./configure && make
+
+export LIBLDAUDIT_PATH="~/latrace-plus/libltaudit.so.0.5.12"
+
+./latrace -N ./etc/latrace.d/latrace.conf -d -A -x cr program args
+`
+
+(the example above launches latrace of a program with a local config, parsing of all stock-provided header file definitions, color highlighting, and symbol address to name resolution)

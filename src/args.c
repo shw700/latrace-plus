@@ -36,7 +36,7 @@
 
 extern int errno;
 extern FILE *lt_args_in;
-extern struct hsearch_data args_struct_xfm_tab, args_func_xfm_tab;
+extern struct hsearch_data args_struct_xfm_tab, args_func_xfm_tab, args_func_intercept_tab;
 int  lt_args_parse();
 void lt_args__switch_to_buffer (YY_BUFFER_STATE new_buffer  );
 void lt_args__delete_buffer (YY_BUFFER_STATE b  );
@@ -922,6 +922,9 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 				if (hsearch_r(e, FIND, &ep, &args_func_xfm_tab))
 					arg->latrace_custom_func_transformer = (void *)ep->data;
+
+				if (hsearch_r(e, FIND, &ep, &args_func_intercept_tab))
+					arg->latrace_custom_func_intercept = (void *)ep->data;
 			}
 
 			break;
@@ -1206,7 +1209,7 @@ do {                                                                 \
 	} else if (arg->fmt && (!strcmp(arg->fmt, "x"))) {
 		ARGS_SPRINTF("0x%lx", unsigned long);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "p"))) {
-		ARGS_SPRINTF("%p", unsigned long);
+		ARGS_SPRINTF("%p", void *);
 	} else if (arg->fmt && (strchr(arg->fmt, 'b'))) {
 		char *tok;
 #define DEFAULT_BINARY_WIDTH 4

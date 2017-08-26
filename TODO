@@ -25,15 +25,14 @@ bugs
 	- check we dont cross all the hardcoded limits
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
-	- latrace crash if struct transformer overrides definition of struct
+	- * latrace crash if struct transformer overrides definition of struct
 
 
 Other:
-	- support pointers to undeclared structure types?
+	- * support pointers to undeclared structure types?
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
 	- Rigid assumptions made of 64 bit ELF objects in transformer libraries
-	- Allow all type definitions to be overridden by most recent declaration
+	- * Allow all type definitions to be overridden by most recent declaration
 	- Suppress identical output lines?
-	- new library loads should trigger symbol load
-	- funcs need user "hooks" for functionality that doesn't format data for display - in addition to transformers
+	- * new library loads should trigger symbol load
 	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten
