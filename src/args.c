@@ -58,7 +58,7 @@ static struct lt_config_shared *bm_config = NULL;
 
 
 /* hardcoded POD types */
-static struct lt_arg args_def_pod[] = {
+struct lt_arg args_def_pod[LT_ARGS_DEF_POD_NUM] = {
 	{
 		.dtype     = LT_ARGS_DTYPE_POD, 
 		.type_id   = LT_ARGS_TYPEID_VOID,
@@ -282,7 +282,6 @@ static struct lt_arg args_def_pod[] = {
 	}
 };
 
-#define LT_ARGS_DEF_POD_NUM     (sizeof(args_def_pod)/sizeof(struct lt_arg))
 
 /* struct, typedef, enum */
 static struct lt_arg args_def_struct[LT_ARGS_DEF_STRUCT_NUM];
@@ -293,7 +292,7 @@ static struct hsearch_data args_enum_tab;
 static struct hsearch_data args_bm_enum_tab;
 
 
-static struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
+struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 {
 	struct lt_enum *en;
 	ENTRY e, *ep;
@@ -314,6 +313,32 @@ static struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 	}
 
 	en = (struct lt_enum*) ep->data;
+
+	PRINT_VERBOSE(cfg, 1, "found %p <%s>\n", en, en->name);
+	return en;
+}
+
+struct lt_bm_enum* getbmenum(struct lt_config_shared *cfg, char *name)
+{
+	struct lt_bm_enum *en;
+	ENTRY e, *ep;
+
+	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
+
+	if (!bm_enum_init) {
+		PRINT_VERBOSE(cfg, 1, "no bm_enum added so far\n", name);
+		return NULL;
+	}
+
+	e.key = name;
+	hsearch_r(e, FIND, &ep, &args_bm_enum_tab);
+
+	if (!ep) {
+		PRINT_VERBOSE(cfg, 1, "failed to find bm_enum <%s>\n", name);
+		return NULL;
+	}
+
+	en = (struct lt_bm_enum*) ep->data;
 
 	PRINT_VERBOSE(cfg, 1, "found %p <%s>\n", en, en->name);
 	return en;
@@ -349,6 +374,7 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 	char lbuf[1024];
 	unsigned long left = val;
 	struct lt_bm_enum* bm_enum;
+	struct lt_enum* _enum = NULL;
 
 	if (!class)
 		goto left;
@@ -359,6 +385,9 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 	memset(lbuf, 0, sizeof(lbuf));
 
 	bm_enum = getbm_enum(cfg, (char *)class);
+
+	if (!bm_enum)
+		_enum = getenum(cfg, (char *)class);
 
 	if (bm_enum) {
 		size_t i;
@@ -379,7 +408,27 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 
 		}
 
+	} else if (_enum) {
+		size_t i;
+
+		for(i = 0; i < _enum->cnt; i++) {
+			struct lt_enum_elem *elem = &_enum->elems[i];
+
+			if (elem->val && (left >= elem->val) && ((left & elem->val) == elem->val)) {
+				if (strlen(lbuf))
+					strcat(lbuf, "|");
+
+				strcat(lbuf, elem->name);
+				left &= ~(elem->val);
+			} else if ((val == 0) && (elem->val == 0)) {
+				strcpy(lbuf, elem->name);
+				break;
+			}
+
+		}
+
 	}
+
 
 left:
 	if (left) {
@@ -389,7 +438,7 @@ left:
 			strcat(lbuf, "|");
 
 		if (fmt && !strcmp(fmt, "o"))
-			sprintf(tmpbuf, "%o", (unsigned int)left);
+			sprintf(tmpbuf, "0%o", (unsigned int)left);
 		else if (fmt && !strcmp(fmt, "d"))
 			sprintf(tmpbuf, "%d", (int)left);
 		else if (fmt && !strcmp(fmt, "u"))
@@ -452,19 +501,20 @@ static struct lt_enum_elem* find_enumelem(struct lt_config_shared *cfg,
 	return NULL;
 }
 
-int lt_args_add_enum(struct lt_config_shared *cfg, char *name, 
-			struct lt_list_head *h)
+int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
+			int bitmask, struct lt_list_head *h)
 {
 	ENTRY e, *ep;
 	struct lt_enum_elem *elem, *last = NULL;
 	struct lt_enum *en;
-	int i = 0;
+	int i = 0, reverted = 0;
 
 	if (NULL == (en = malloc(sizeof(*en))))
 		return -1;
 
 	memset(en, 0x0, sizeof(*en));
 	en->name = name;
+	en->bitmask = bitmask;
 
 	/* Initialize the hash table holding enum names */
 	if (!enum_init) {
@@ -528,7 +578,25 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 
 	/* fixup values */
 	for(i = 0; i < en->cnt; i++) {
+		char *this_fmt = NULL;
 		elem = &en->elems[i];
+
+		if (elem->base == 16)
+			this_fmt = "x";
+		else if (elem->base == 8)
+			this_fmt = "o";
+		else if (elem->base == -10)
+			this_fmt = "d";
+
+		if (!en->fmt && elem->base != 10) {
+			en->fmt = this_fmt;
+		} else if (!reverted && en->fmt && en->fmt != this_fmt) {
+			if (strcmp(en->fmt, "d") && this_fmt != NULL) {
+				PRINT_ERROR("Warning: enum type %s had values with multiple bases; reverting to hexadecimal.\n", name);
+				this_fmt = "x";
+				reverted = 1;
+			}
+		}
 
 		if (!elem->undef) {
 			last = elem;
@@ -638,6 +706,7 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 	char *name, char *val)
 {
 	struct lt_enum_elem* elem;
+	int base = 10;
 
 	if (NULL == (elem = malloc(sizeof(*elem))))
 		return NULL;
@@ -650,7 +719,7 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 		char *endptr;
 
 		errno = 0;
-		num = strtol(val, &endptr, 10);
+		num = strtol(val, &endptr, 0);
 
 		/* parse errors */
 		if ((errno == ERANGE && (num == LONG_MAX || num == LONG_MIN)) || 
@@ -662,6 +731,16 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 		if (endptr != val) {
 			elem->val   = num;
 			elem->undef = 0;
+
+			if (num) {
+				if (!strncmp(val, "0x", 2))
+					base = 16;
+				else if (*val == '0')
+					base = 8;
+				else if (*val == '-')
+					base = -10;
+			}
+
 		} else {
 			/* if no digits were found, we assume the
 			 * value is set by string reference */
@@ -670,6 +749,7 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 
 	}
 
+	elem->base = base;
 	elem->name = strdup(name);
 
 	PRINT_VERBOSE(cfg, 3, "enum elem %s = %d, strval %s, undef = %d\n",
@@ -865,7 +945,7 @@ static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 	return arg;
 }
 
-static struct lt_arg* find_arg(struct lt_config_shared *cfg, const char *type, 
+struct lt_arg* find_arg(struct lt_config_shared *cfg, const char *type,
 			struct lt_arg argsdef[], int size, int create)
 {
 	int i;
@@ -972,6 +1052,11 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		if ((arg->en = getenum(cfg, enum_name)) == NULL) {
 			return NULL;
 		}
+
+		if (arg->en->bitmask)
+			bitmask = enum_name;
+
+		fmt = arg->en->fmt;
 	}
 
 	arg->name    = strdup(name);
@@ -982,7 +1067,7 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 	if (!arg->pointer)
 		arg->pointer = pointer;
 
-	if (fmt)
+	if (fmt && *fmt)
 		arg->fmt = strdup(fmt);
 
 	if (bitmask)

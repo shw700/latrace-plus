@@ -25,6 +25,8 @@
 struct lt_config_shared;
 struct lt_symbol;
 
+#define LT_ARGS_DEF_POD_NUM	17
+
 enum {
 	LT_ARGS_DTYPE_POD = 1,
 	LT_ARGS_DTYPE_STRUCT,
@@ -69,12 +71,15 @@ struct lt_enum_elem {
 	char *strval;
 	long val;
 	int undef;
+	int base;
 	struct lt_list_head list;
 };
 
 struct lt_enum {
 	char *name;
 	int cnt;
+	int bitmask;
+	char *fmt;
 	struct lt_enum_elem *elems;
 };
 
@@ -163,7 +168,7 @@ int lt_args_sym_entry(struct lt_config_shared *cfg, struct lt_symbol *sym,
 int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 			La_regs *inregs, La_retval *outregs,
 			char **argbuf, char **argdbuf);
-int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
+int lt_args_add_enum(struct lt_config_shared *cfg, char *name, int bitmask,
 			struct lt_list_head *h);
 int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 			struct lt_list_head *h);

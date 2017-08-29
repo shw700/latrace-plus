@@ -78,6 +78,7 @@ whitespace	([ \t])
 "struct"		{ return STRUCT; }
 "enum"			{ return ENUM; }
 "bm_enum"		{ return BM_ENUM; }
+"enum_bm"		{ return BM_ENUMX; }
 "typedef"		{ return TYPEDEF; }
 {name}[!~^]?		{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
 "\*"+			{ return POINTER; }

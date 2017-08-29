@@ -33,6 +33,14 @@
 int lt_args_lex(void);
 void lt_args_error(const char *m);
 
+extern struct lt_enum *getenum(struct lt_config_shared *cfg, char *name);
+extern struct lt_bm_enum *getbmenum(struct lt_config_shared *cfg, char *name);
+extern struct lt_arg* find_arg(struct lt_config_shared *cfg, const char *type,
+				struct lt_arg argsdef[], int size, int create);
+
+extern struct lt_arg args_def_pod[LT_ARGS_DEF_POD_NUM];
+
+
 static struct lt_config_shared *scfg;
 static int struct_alive = 0;
 static int struct_empty = 1;
@@ -85,7 +93,7 @@ do { \
 
 %}
 
-%token NAME FILENAME STRUCT ENUM BM_ENUM TYPEDEF INCLUDE END POINTER ATTRIBUTE
+%token NAME FILENAME STRUCT ENUM BM_ENUM BM_ENUMX TYPEDEF INCLUDE END POINTER ATTRIBUTE
 
 %union
 {
@@ -177,9 +185,19 @@ STRUCT_DEF DEF ';'
 
 /* enum definitions */
 enum_def:
+BM_ENUMX NAME '{' ENUM_DEF '}' ';'
+{
+	switch(lt_args_add_enum(scfg, $2, 1, $4)) {
+	case -1:
+		ERROR("failed to add enum[1] %s\n", $2);
+	case 1:
+		ERROR("enum limit reached(%d) - %s\n", LT_ARGS_DEF_STRUCT_NUM, $2);
+	};
+}
+|
 ENUM NAME '{' ENUM_DEF '}' ';'
 {
-	switch(lt_args_add_enum(scfg, $2, $4)) {
+	switch(lt_args_add_enum(scfg, $2, 0, $4)) {
 	case -1:
 		ERROR("failed to add enum[1] %s\n", $2);
 	case 1:
@@ -389,7 +407,24 @@ ARGS ',' DEF
 }
 | NAME
 {
-	GET_LIST_HEAD($$);
+
+	if (!getenum(scfg, $1)) {
+		if (find_arg(scfg, $1, args_def_pod, LT_ARGS_DEF_POD_NUM, 0) == NULL)
+	                ERROR("unnamed variable of unknown type: %s\n", $1);
+
+		GET_LIST_HEAD($$);
+	} else {
+		struct lt_list_head *h;
+		struct lt_arg *arg = NULL;
+
+		if (NULL == (arg = lt_args_getarg(scfg, "int", "_anon_", 0, 1, $1)))
+			ERROR("unknown error parsing anonymous enum instance of type: %s\n", $1);
+
+		GET_LIST_HEAD(h);
+		lt_list_add_tail(&arg->args_list, h);
+		$$ = h;
+	}
+
 }
 | /* left intentionally blank */
 {
@@ -425,8 +460,15 @@ NAME NAME ENUM_REF
 {
 	struct lt_arg *arg;
 
-	if (NULL == (arg = lt_args_getarg(scfg, $1, $2, 0, 1, $3)))
-		ERROR("unknown argument type[2] - %s; possibly due to enum specification of \"%s\"\n", $1, $3);
+	if (NULL == (arg = lt_args_getarg(scfg, $1, $2, 0, 1, $3))) {
+		if (getenum(scfg, $1) == NULL) {
+			if (getbmenum(scfg, $1) == NULL)
+				ERROR("unknown argument type[2a] - %s; possibly due to enum specification of \"%s\"\n", $1, $3);
+		}
+
+		if (NULL == (arg = lt_args_getarg(scfg, "int", $2, 0, 1, $1)))
+			ERROR("unknown argument type[2b] - %s; possibly due to enum specification of \"%s\"\n", $1, $3);
+	}
 
 	$$ = arg;
 }
@@ -463,8 +505,15 @@ STRUCT NAME POINTER NAME ENUM_REF
 NAME
 {
 	struct lt_arg *arg;
-	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 0, 1, NULL)))
-		ERROR("unknown argument type[6] - %s\n", $1);
+	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 0, 1, NULL))) {
+
+		if (getenum(scfg, $1) == NULL)
+			ERROR("unknown argument type[6a] - %s\n", $1);
+
+		if (NULL == (arg = lt_args_getarg(scfg, "int", "_anon_", 0, 1, $1)))
+			ERROR("unknown argument type[6b] - %s\n", $1);
+
+	}
 
 	$$ = arg;
 }

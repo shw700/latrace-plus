@@ -35,4 +35,4 @@ Other:
 	- Suppress identical output lines?
 	- * New library loads should trigger symbol load
 	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten
-	- * Allow use of enum and bm_enum types without special variable type declarations
+	- * get rid of old bm_enum declaration type
