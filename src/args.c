@@ -54,6 +54,8 @@ int lt_args_parse_init(struct lt_config_shared *cfg, struct lt_include *inc);
 static int enum_init = 0;
 static int bm_enum_init = 0;
 
+static struct lt_config_shared *bm_config = NULL;
+
 
 /* hardcoded POD types */
 static struct lt_arg args_def_pod[] = {
@@ -343,15 +345,18 @@ static struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
-static char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt) {
+char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt) {
 	char lbuf[1024];
 	unsigned long left = val;
 	struct lt_bm_enum* bm_enum;
 
-	memset(lbuf, 0, sizeof(lbuf));
-
 	if (!class)
 		goto left;
+
+	if (!cfg)
+		cfg = bm_config;
+
+	memset(lbuf, 0, sizeof(lbuf));
 
 	bm_enum = getbm_enum(cfg, (char *)class);
 
@@ -586,6 +591,7 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	                return -1;
 	        }
 		bm_enum_init = 1;
+		bm_config = cfg;
 	}
 
 	e.key = en->name;

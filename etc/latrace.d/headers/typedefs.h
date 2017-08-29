@@ -8,7 +8,7 @@ typedef u_int uint32_t;
 typedef uint32_t in_addr_t;
 
 typedef int socklen_t;
-typedef int size_t;
+typedef unsigned int size_t;
 
 typedef void FILE;
 typedef void DIR;

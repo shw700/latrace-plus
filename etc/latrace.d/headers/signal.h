@@ -45,6 +45,16 @@ enum SIGNAL_HANDLER {
 	SIG_ERR = -1
 };
 
+bm_enum sa_flag {
+	SA_NOCLDSTOP  =  0x00000001,
+	SA_NOCLDWAIT  =  0x00000002,
+	SA_SIGINFO    =  0x00000004,
+	SA_ONSTACK    =  0x08000000,
+	SA_RESTART    =  0x10000000,
+	SA_NODEFER    =  0x40000000,
+	SA_RESETHAND  =  0x80000000
+};
+
 
 void*   __sysv_signal(int sig = SIGNALS, void *handler = SIGNAL_HANDLER);
 void*   sysv_signal(int sig = SIGNALS, void *handler = SIGNAL_HANDLER);
@@ -80,6 +90,7 @@ int     sigorset(void *set, void *left, void *right);
 int     sigprocmask(int how, void *set, void *oset);
 int     sigsuspend(void *set);
 int     sigaction(int sig = SIGNALS, void *act, void *oact);
+//int     sigaction(int sig = SIGNALS, struct sigaction *act, struct sigaction *oact);
 int     sigpending(void *set);
 int     sigwait(void *set, int *sig);
 int     sigwaitinfo(void *set, void *info);
