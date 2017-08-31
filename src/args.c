@@ -126,6 +126,19 @@ struct lt_arg args_def_pod[LT_ARGS_DEF_POD_NUM] = {
 	},
 	{
 		.dtype     = LT_ARGS_DTYPE_POD, 
+		.type_id   = LT_ARGS_TYPEID_UINT,
+		.type_len  = sizeof(unsigned int),
+		.type_name = "unsigned",
+		.pointer   = 0,
+		.name      = "",
+		.mmbcnt    = 0,
+                .arch      = NULL,
+		.en        = NULL,
+		.args_head = NULL,
+		.args_list = { NULL, NULL }
+	},
+	{
+		.dtype     = LT_ARGS_DTYPE_POD,
 		.type_id   = LT_ARGS_TYPEID_LONG,
 		.type_len  = sizeof(long),
 		.type_name = "long",
@@ -394,6 +407,12 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 
 		for(i = 0; i < bm_enum->cnt; i++) {
 			struct lt_bm_enum_elem *elem = &bm_enum->elems[i];
+
+			if (elem->val == val) {
+				strcpy(lbuf, elem->name);
+				left = 0;
+				break;
+			}
 
 			if (elem->val && (left >= elem->val) && ((left & elem->val) == elem->val)) {
 				if (strlen(lbuf))
@@ -976,17 +995,42 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 			const char *name, int pointer, int create, char *enum_name)
 {
 	struct lt_arg *arg;
-	char *bitmask = NULL, *fmt = NULL, *name_copy = NULL;
+	char *bitmask = NULL, *fmt = NULL, *name_copy = NULL, *modifier = NULL;
+	int collapsed = 0;
 
 	if (name) {
 		bitmask = strchr(name, '|');
 		fmt = strchr(name, '/');
 	}
 
-	if (bitmask || fmt) {
+	if (bitmask && (bitmask < fmt))
+		modifier = bitmask - 1;
+	else if (fmt && (fmt < bitmask))
+		modifier = fmt - 1;
+	else if (name)
+		modifier = (char *)&name[strlen(name)-1];
+
+	if (modifier) {
+		if (*modifier == '!')
+			collapsed = COLLAPSED_BASIC;
+		else if (*modifier == '~')
+			collapsed = COLLAPSED_TERSE;
+		else if (*modifier == '^')
+			collapsed = COLLAPSED_BARE;
+	}
+
+	if (!collapsed)
+		modifier = NULL;
+
+	if (bitmask || fmt || modifier) {
 		name_copy = strdup(name);
 		bitmask = strchr(name_copy, '|');
 		fmt = strchr(name_copy, '/');
+
+		if (modifier) {
+			modifier = name_copy + (modifier - name);
+			*modifier = 0;
+		}
 
 		if (bitmask)
 			*bitmask++ = 0;
@@ -1072,6 +1116,9 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 	if (bitmask)
 		arg->bitmask_class = strdup(bitmask);
+
+	if (collapsed)
+		arg->collapsed = collapsed;
 
 	if (name_copy)
 		free(name_copy);
@@ -1229,13 +1276,17 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 	} else if (arg->type_id == LT_ARGS_TYPEID_FNPTR) {
 		void *fn = *((void **) pval);
 		const char *fname;
+		const char *dname1, *dname2;
+
+		dname1 = dspname ? arg->name : "";
+		dname2 = dspname ? "=" : "";
 
 		if (!fn)
-			len = snprintf(argbuf, alen, "%s=fn@NULL", arg->name);
+			len = snprintf(argbuf, alen, "%s%sfn@ NULL", dname1, dname2);
 		else if ((fname = lookup_addr(fn)))
-			len = snprintf(argbuf, alen, "%s=fn@%s()", arg->name, fname);
+			len = snprintf(argbuf, alen, "%s%sfn@ %s()", dname1, dname2, fname);
 		else
-			len = snprintf(argbuf, alen, "%s=fn@%p", arg->name, fn);
+			len = snprintf(argbuf, alen, "%s%sfn@ %p", dname1, dname2, fn);
 
 		goto out;
 	}
@@ -1267,16 +1318,24 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 
 				if (cfg->resolve_syms && (aname = get_address_mapping(ptr, &off))) {
 					const char *fmt_on = "", *fmt_off = "";
+					int demangled = 0;
 
 					if (cfg->fmt_colors) {
 						fmt_on = BOLD;
 						fmt_off = BOLDOFF;
 					}
 
+					if (cfg->demangle)
+						DEMANGLE(aname, demangled);
+
 					if (off)
 						len = snprintf(argbuf, alen, "%s%s+%zu%s", fmt_on, aname, off, fmt_off);
 					else
 						len = snprintf(argbuf, alen, "%s%s%s", fmt_on, aname, fmt_off);
+
+					if (demangled)
+						free((char *)aname);
+
 				} else
 					len = snprintf(argbuf, alen, "%p", ptr);
 			} else
@@ -1472,7 +1531,7 @@ int lt_args_cb_struct(struct lt_config_shared *cfg, int type, struct lt_arg *arg
 }
 
 static int getargs(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-		La_regs *regs, char **abuf, char **adbuf)
+		La_regs *regs, char **abuf, char **adbuf, int silent)
 {
 	struct lt_args_data data;
 	int arglen;
@@ -1508,7 +1567,7 @@ static int getargs(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 	data.args_buf = buf;
 	data.args_len = cfg->args_maxlen;
 
-	return lt_stack_process(cfg, asym, regs, &data);
+	return lt_stack_process(cfg, asym, regs, &data, silent);
 }
 
 struct lt_args_sym* lt_args_sym_get(struct lt_config_shared *cfg,
@@ -1532,18 +1591,18 @@ struct lt_args_sym* lt_args_sym_get(struct lt_config_shared *cfg,
 }
 
 int lt_args_sym_entry(struct lt_config_shared *cfg, struct lt_symbol *sym,
-			La_regs *regs, char **argbuf, char **argdbuf)
+			La_regs *regs, char **argbuf, char **argdbuf, int silent)
 {
 	struct lt_args_sym *asym = sym ? sym->args : NULL;
 
 	if (!asym)
 		return -1;
 
-	return getargs(cfg, asym, regs, argbuf, argdbuf);
+	return getargs(cfg, asym, regs, argbuf, argdbuf, silent);
 }
 
 static int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-		La_regs *iregs, La_retval *regs, char **abuf, char **adbuf)
+		La_regs *iregs, La_retval *regs, char **abuf, char **adbuf, int silent)
 {
 	struct lt_args_data data;
 	int arglen, totlen;
@@ -1578,17 +1637,17 @@ static int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 	data.args_len    = cfg->args_maxlen;
 	data.args_totlen = totlen;
 
-	return lt_stack_process_ret(cfg, asym, iregs, regs, &data);
+	return lt_stack_process_ret(cfg, asym, iregs, regs, &data, silent);
 }
 
 int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 			La_regs *inregs, La_retval *outregs,
-			char **argbuf, char **argdbuf)
+			char **argbuf, char **argdbuf, int silent)
 {
 	struct lt_args_sym *asym = sym ? sym->args : NULL;
 
 	if (!asym)
 		return -1;
 
-	return getargs_ret(cfg, asym, inregs, outregs, argbuf, argdbuf);
+	return getargs_ret(cfg, asym, inregs, outregs, argbuf, argdbuf, silent);
 }

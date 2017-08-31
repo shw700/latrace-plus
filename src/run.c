@@ -147,7 +147,8 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 				msym->data + msym->arg,
 				msym->data + msym->argd);
 
-		t->indent_depth--;
+		if (t->indent_depth)
+			t->indent_depth--;
 	}
 
 	return 0;

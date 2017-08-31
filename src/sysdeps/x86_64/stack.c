@@ -642,7 +642,7 @@ exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t
 #endif
 
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-			La_regs *regs, struct lt_args_data *data)
+			La_regs *regs, struct lt_args_data *data, int silent)
 {
 	int i;
 
@@ -692,7 +692,15 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			CRASH_EPILOGUE();
 		}
 
+/*		if (silent) {
+			free(targs);
+			return 0;
+		} */
+
 		enter_transformer_callstack(asym->name, regs, targs, asym->argcnt-1);
+
+		if (silent)
+			return 0;
 
 		if (!tres) {
 			data->args_totlen += strlen(data->args_buf+data->args_totlen);
@@ -798,7 +806,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 }
 
 int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_regs *iregs, La_retval *regs, struct lt_args_data *data)
+			La_regs *iregs, La_retval *regs, struct lt_args_data *data, int silent)
 {
 	struct lt_arg *arg;
 	void *pval;
@@ -808,11 +816,12 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 	if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer ||
 		asym->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
-		void **inargs;
+		void **inargs = NULL;
 		void *retval = pval;
-		size_t inargs_size;
+		size_t inargs_size = 0;
 		int tres = -1;
 
+//		if (!silent && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
 		if (exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
 			PRINT_ERROR("%s", "Error retrieving function entry arguments from transformer call stack\n");
 			inargs = NULL;
@@ -835,7 +844,7 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			CRASH_EPILOGUE();
 		}
 
-		if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
+		if (!silent && asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
 			if (fault_reason) {
@@ -853,13 +862,15 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		if (inargs)
 			free(inargs);
 
+		if (silent)
+			return 0;
+
 		if (!tres) {
 			data->args_totlen += strlen(data->args_buf+data->args_totlen);
 			return tres;
 		}
 
 	}
-
 
 	lt_args_cb_arg(cfg, arg, pval, data, 1, 0);
 

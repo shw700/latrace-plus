@@ -9,7 +9,7 @@ for 0.5.12
 	- config - arrays in structures
 	- variable length argument output (printf like)
 	- config - long/float/double support
-	- * segfault handling support (libSegFault.so loading support)
+	- segfault handling support (libSegFault.so loading support)
 	- statistics for recursive calls
 	- other LD_AUDIT interface functions utilization
 	- statistics check
@@ -26,6 +26,7 @@ bugs
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- * latrace crash if struct transformer overrides definition of struct
+	- * prevent multiple deferences of char *, i.e. char ** and char ***
 
 
 Other:
@@ -36,3 +37,6 @@ Other:
 	- * New library loads should trigger symbol load
 	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten
 	- * get rid of old bm_enum declaration type
+	- * /p switch should allow any struct pointer to be displayed as a memory address
+	- Should probably reap old thread_buffers
+	- * User override of transformers dir with environment variable

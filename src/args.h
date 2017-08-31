@@ -25,7 +25,7 @@
 struct lt_config_shared;
 struct lt_symbol;
 
-#define LT_ARGS_DEF_POD_NUM	17
+#define LT_ARGS_DEF_POD_NUM	18
 
 enum {
 	LT_ARGS_DTYPE_POD = 1,
@@ -113,6 +113,7 @@ struct lt_arg {
 	/* auxiliary interpretation parameters */
 	char *fmt;
 	char *bitmask_class;
+	int collapsed;
 
 	/* custom user-defined transformer */
 	int (*latrace_custom_struct_transformer)(void *obj, char *buf, size_t blen);
@@ -164,10 +165,10 @@ int lt_args_init(struct lt_config_shared *cfg);
 struct lt_args_sym* lt_args_sym_get(struct lt_config_shared *cfg,
 					const char *sym);
 int lt_args_sym_entry(struct lt_config_shared *cfg, struct lt_symbol *sym,
-			La_regs *regs, char **argbuf, char **argdbuf);
+			La_regs *regs, char **argbuf, char **argdbuf, int silent);
 int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 			La_regs *inregs, La_retval *outregs,
-			char **argbuf, char **argdbuf);
+			char **argbuf, char **argdbuf, int silent);
 int lt_args_add_enum(struct lt_config_shared *cfg, char *name, int bitmask,
 			struct lt_list_head *h);
 int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
@@ -193,8 +194,9 @@ int lt_args_cb_struct(struct lt_config_shared *cfg, int type,
 
 /* stack handling */
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_regs *regs, struct lt_args_data *data);
+			La_regs *regs, struct lt_args_data *data, int silent);
 int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_regs *iregs, La_retval *regs, struct lt_args_data *data);
+			La_regs *iregs, La_retval *regs, struct lt_args_data *data,
+			int silent);
 
 #endif /* ARGS_H */

@@ -34,6 +34,7 @@
 #include "list.h"
 
 #define TRANSFORMER_CRASH_PROTECTION 1
+#define TRANSFORMER_CRASH_PROTECTION_ENHANCED 1
 
 #ifdef TRANSFORMER_CRASH_PROTECTION
 #include <signal.h>
@@ -461,6 +462,24 @@ do { \
 
 #define PRINT_COLOR(color, fmt, ...)	fprintf(stderr, color fmt RESET, __VA_ARGS__)
 #define PRINT_ERROR(fmt, ...)		PRINT_COLOR(BOLDRED, fmt, __VA_ARGS__)
+
+
+/* libiberty external */
+extern char* cplus_demangle(const char *mangled, int options);
+
+#ifdef CONFIG_LIBERTY
+#define DEMANGLE(sym, d) \
+do { \
+	char *dem; \
+	dem = cplus_demangle(sym, 0); \
+	if (dem) { \
+		sym = dem; \
+		d = 1; \
+	} \
+} while(0)
+#else
+#define DEMANGLE(sym, d)
+#endif
 
 
 #if defined(__x86_64)

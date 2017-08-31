@@ -22,10 +22,30 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <stdarg.h>
+#include <pthread.h>
 
 #include "config.h"
 
 static char spaces[] = "                                                                                                                                                                           ";
+
+
+typedef struct thread_buffer {
+	pid_t tid;
+	char *buf;
+	struct thread_buffer *next;
+} thread_buffer_t;
+
+thread_buffer_t *thread_buffers = NULL;
+pthread_mutex_t threadbuf_lock = PTHREAD_MUTEX_INITIALIZER;
+
+#define PRINT_DETAILS(tobuf,buf) \
+do { \
+	if (tobuf) \
+		outbuf = sprintf_cat(outbuf, 8192, "%s\n", buf); \
+	else \
+		print_details(cfg, buf); \
+} while(0)
 
 static int print_details(struct lt_config_shared *cfg, char *argdbuf)
 {
@@ -33,12 +53,27 @@ static int print_details(struct lt_config_shared *cfg, char *argdbuf)
 	return 0;
 }
 
-#define PRINT_TID(tid) \
+#define PRINT_DATA(tobuf,fmt,...) \
+do { \
+	if (!tobuf) { \
+		fprintf(cfg->fout, fmt, __VA_ARGS__); \
+		fflush(NULL); \
+	} \
+	else { \
+		outbuf = sprintf_cat(outbuf, 8192, fmt, __VA_ARGS__); \
+	} \
+} while(0)
+
+#define FPRINT_TID(tid) \
 do { \
 	fprintf(cfg->fout, "%5d   ", tid); \
 } while(0)
+#define SPRINT_TID(tid) \
+do { \
+	outbuf = sprintf_cat(outbuf, 8192, "%5d   ", tid); \
+} while(0)
 
-#define PRINT_TIME(tv) \
+#define FPRINT_TIME(tv) \
 do { \
 	struct tm t; \
 \
@@ -53,25 +88,136 @@ do { \
 		t.tm_sec, \
 		(unsigned int) tv->tv_usec); \
 } while(0)
-
-/* libiberty external */
-extern char* cplus_demangle(const char *mangled, int options);
-
-#ifdef CONFIG_LIBERTY
-#define DEMANGLE(sym, d) \
+#define SPRINT_TIME(tv) \
 do { \
-	char *dem; \
-	dem = cplus_demangle(sym, 0); \
-	if (dem) { \
-		sym = dem; \
-		d = 1; \
-	} \
+	struct tm t; \
+\
+	gettimeofday(tv, NULL); \
+	localtime_r(&tv->tv_sec, &t); \
+	outbuf = sprintf_cat(outbuf, 8192, "[%02d/%02d/%4d %02d:%02d:%02d.%06u]   ", \
+		t.tm_mon, \
+		t.tm_mday, \
+		t.tm_year + 1900, \
+		t.tm_hour, \
+		t.tm_min, \
+		t.tm_sec, \
+		(unsigned int) tv->tv_usec); \
 } while(0)
-#else
-#define DEMANGLE(sym, d)
-#endif
 
 char *color_table[6] = { RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN };
+
+
+static char *
+sprintf_cat(char *buf, size_t bufsize, char *fmt, ...)
+{
+	va_list ap;
+	char tmpbuf[1024], *result;
+	int csize, nsize = 0;
+
+	va_start(ap, fmt);
+	memset(tmpbuf, 0, sizeof(tmpbuf));
+	csize = vsnprintf(tmpbuf, sizeof(tmpbuf), fmt, ap);
+	va_end(ap);
+
+	if (csize < 0)
+		return NULL;
+
+	if (!buf)
+		result = strdup(tmpbuf);
+	else {
+		nsize = strlen(buf) + csize + 1;
+		result = realloc(buf, nsize);
+		strncat(result, tmpbuf, csize);
+	}
+
+	return result;
+}
+
+static void
+buffer_output_data(pid_t tid, const char *output)
+{
+	thread_buffer_t *tb;
+	char *outbuf;
+	size_t nlen = 0;
+	int was_empty = 0;
+
+	if (!output || !*output)
+		return;
+
+	pthread_mutex_lock(&threadbuf_lock);
+	tb = thread_buffers;
+
+	while (tb && (tb->tid != tid))
+		tb = tb->next;
+
+	if (tb && tb->buf)
+		nlen = strlen(tb->buf);
+	else
+		was_empty = 1;
+
+	nlen += strlen(output) + 1;
+
+	if (was_empty)
+		outbuf = strdup(output);
+	else
+		outbuf = realloc(tb->buf, nlen);
+
+	if (!outbuf) {
+		PRINT_ERROR("%s", "Error: unable to allocate memory for output buffer");
+		pthread_mutex_unlock(&threadbuf_lock);
+		return;
+	}
+
+	if (!was_empty)
+		strcat(outbuf, output);
+
+	if (!tb) {
+
+		if (!(tb = (thread_buffer_t *)malloc(sizeof(thread_buffer_t)))) {
+			PRINT_ERROR("%s", "Error: unable to allocate memory for output buffer");
+			pthread_mutex_unlock(&threadbuf_lock);
+			return;
+		}
+
+		memset(tb, 0, sizeof(thread_buffer_t));
+		tb->tid = tid;
+		tb->next = thread_buffers;
+		thread_buffers = tb;
+	}
+
+	tb->buf = outbuf;
+	pthread_mutex_unlock(&threadbuf_lock);
+	return;
+}
+
+char *
+pop_output_data(pid_t tid)
+{
+	thread_buffer_t *tb;
+	char *result;
+
+	pthread_mutex_lock(&threadbuf_lock);
+	tb = thread_buffers;
+
+	while (tb && (tb->tid != tid))
+		tb = tb->next;
+
+	if (!tb)
+		result = NULL;
+	else {
+		result = tb->buf;
+		tb->buf = NULL;
+
+		if (tb != thread_buffers) {
+			tb->next = thread_buffers;
+			thread_buffers = tb;
+		}
+
+	}
+
+	pthread_mutex_unlock(&threadbuf_lock);
+	return result;
+}
 
 int lt_out_entry(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
@@ -82,19 +228,50 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	const char *cur_color = NULL;
 	const char *end_line = "{\n";
 	int demangled = 0;
+	char *outbuf = NULL;
+	int buffered;
+
+	buffered = (collapsed > 0);
+
+	/* Would probably be helpful to pre-allocate buffer for data and not constantly resize it */
+/*	if (buffered) {
+		outbuf = malloc(8192);
+		memset(outbuf, 0, sizeof(outbuf));
+	} */
 
 	if (collapsed == COLLAPSED_NESTED) {
-		fprintf(cfg->fout, "-> %s()", symname);
-		fflush(NULL);
+		int demangled = 0;
+
+		if (cfg->demangle)
+			DEMANGLE(symname, demangled);
+
+		PRINT_DATA(buffered, "-> %s()", symname);
+
+		if (demangled)
+			free((char *)symname);
+
+		if (outbuf) {
+			buffer_output_data(tid, outbuf);
+			free(outbuf);
+		}
+
 		return 0;
 	}
 
-	if (cfg->timestamp && tv)
-		PRINT_TIME(tv);
+	if (cfg->timestamp && tv) {
+		if (buffered)
+			SPRINT_TIME(tv);
+		else
+			FPRINT_TIME(tv);
+	}
 
 	/* Print thread ID */
-	if (!cfg->hide_tid)
-		PRINT_TID(tid);
+	if (!cfg->hide_tid) {
+		if (buffered)
+			SPRINT_TID(tid);
+		else
+			FPRINT_TID(tid);
+	}
 
 	/* Print indentation. */
 	if (indent_depth && cfg->indent_sym) {
@@ -102,7 +279,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 		if (cfg->fmt_colors)
 			cur_color = color_table[indent_depth % (sizeof(color_table)/sizeof(color_table[0]))];
 
-		fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
+		PRINT_DATA(buffered, "%.*s", indent_depth * cfg->indent_size, spaces);
 	}
 
 	/* Demangle the symbol if needed */
@@ -124,17 +301,17 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	/* Print the symbol and arguments. */
 	if (cur_color) {
 		if (*argbuf)
-			fprintf(cfg->fout, "%s%s%s%s(%s%s%s) [%s] %s",
+			PRINT_DATA(buffered, "%s%s%s%s(%s%s%s) [%s] %s",
 				BOLD, cur_color, symname, RESET, cur_color, argbuf, RESET, lib_to, end_line);
 		else
-			fprintf(cfg->fout, "%s%s%s [%s] %c\n", 
+			PRINT_DATA(buffered, "%s%s%s [%s] %c\n",
 						cur_color, symname, RESET, lib_to,
 						cfg->braces ? '{' : ' ');
 	} else {
 		if (*argbuf)
-			fprintf(cfg->fout, "%s(%s) [%s] %s", symname, argbuf, lib_to, end_line);
+			PRINT_DATA(buffered, "%s(%s) [%s] %s", symname, argbuf, lib_to, end_line);
 		else
-			fprintf(cfg->fout, "%s [%s] %c\n", 
+			PRINT_DATA(buffered, "%s [%s] %c\n",
 						symname, lib_to,
 						cfg->braces ? '{' : ' ');
 	}
@@ -144,9 +321,15 @@ int lt_out_entry(struct lt_config_shared *cfg,
 
 	/* Print arguments' details. */
 	if (cfg->args_detailed && *argdbuf)
-		print_details(cfg, argdbuf);
+		PRINT_DETAILS(buffered, argdbuf);
 
 	fflush(NULL);
+
+	if (outbuf) {
+		buffer_output_data(tid, outbuf);
+		free(outbuf);
+	}
+
 	return 0;
 }
 
@@ -157,17 +340,23 @@ int lt_out_exit(struct lt_config_shared *cfg,
 			char *argbuf, char *argdbuf)
 {
 	const char *cur_color = NULL;
+	char *prefix;
 	int demangled = 0;
+
+	if ((prefix = pop_output_data(tid))) {
+		fprintf(cfg->fout, "%s", prefix);
+		free(prefix);
+	}
 
 	if (!*argbuf && (!cfg->braces))
 		return 0;
 
 	if (cfg->timestamp && tv)
-		PRINT_TIME(tv);
+		FPRINT_TIME(tv);
 
 	/* Print thread ID */
 	if ((!cfg->hide_tid) && (collapsed <= COLLAPSED_BASIC))
-		PRINT_TID(tid);
+		FPRINT_TID(tid);
 
 	/* Print indentation. */
 	if (indent_depth && cfg->indent_sym) {

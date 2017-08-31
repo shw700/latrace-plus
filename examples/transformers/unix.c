@@ -114,7 +114,7 @@ latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t blen)
 			snprintf(handlerbuf, sizeof(handlerbuf), "handler=%p", obj->sa_handler);
 	}
 
-	snprintf(buf, blen, "[%s, flags=%s, mask=%s", handlerbuf, flagsbuf, sigbuf);
+	snprintf(buf, blen, "[%s, flags=%s, mask=%s]", handlerbuf, flagsbuf, sigbuf);
 
 	return 0;
 }

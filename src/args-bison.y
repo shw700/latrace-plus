@@ -46,12 +46,13 @@ static int struct_alive = 0;
 static int struct_empty = 1;
 struct lt_include *lt_args_sinc;
 
-const char *typedef_mapping_table[10][2] =
+const char *typedef_mapping_table[11][2] =
 {
 	{ "unsigned long long", "u_llong" },
 	{ "signed long long", "llong" },
 	{ "unsigned long", "u_long" },
 	{ "signed long", "long" },
+	{ "long int", "long" },
 	{ "unsigned int", "u_int" },
 	{ "signed int", "int" },
 	{ "unsigned short", "u_short" },
@@ -92,6 +93,7 @@ do { \
 } while(0)
 
 %}
+
 
 %token NAME FILENAME STRUCT ENUM BM_ENUM BM_ENUMX TYPEDEF INCLUDE END POINTER ATTRIBUTE
 
@@ -326,29 +328,8 @@ func_def:
 DEF '(' ARGS ')' ';'
 {
 	struct lt_arg *arg = $1;
-	size_t alen;
-	int collapsed = 0;
 
-	alen = strlen(arg->name);
-
-	if (alen) {
-		switch(arg->name[alen-1]) {
-			case '!':
-				collapsed = COLLAPSED_BASIC;
-				break;
-			case '~':
-				collapsed = COLLAPSED_TERSE;
-				break;
-			case '^':
-				collapsed = COLLAPSED_BARE;
-				break;
-		}
-
-		if (collapsed)
-			arg->name[alen-1] = 0;
-	}
-
-	if (lt_args_add_sym(scfg, arg, $3, collapsed))
+	if (lt_args_add_sym(scfg, arg, $3, arg->collapsed))
 		ERROR("failed to add symbol %s\n", arg->name);
 
 	/* force creation of the new list head */
@@ -358,29 +339,8 @@ DEF '(' ARGS ')' ';'
 DEF '(' ARGS ')' ATTRIBUTE ';'
 {
 	struct lt_arg *arg = $1;
-	size_t alen;
-	int collapsed = 0;
 
-	alen = strlen(arg->name);
-
-	if (alen) {
-		switch(arg->name[alen-1]) {
-			case '!':
-				collapsed = COLLAPSED_BASIC;
-				break;
-			case '~':
-				collapsed = COLLAPSED_TERSE;
-				break;
-			case '^':
-				collapsed = COLLAPSED_BARE;
-				break;
-		}
-
-		if (collapsed)
-			arg->name[alen-1] = 0;
-	}
-
-	if (lt_args_add_sym(scfg, arg, $3, collapsed))
+	if (lt_args_add_sym(scfg, arg, $3, arg->collapsed))
 		ERROR("failed to add symbol %s\n", arg->name);
 
 	/* force creation of the new list head */
@@ -455,6 +415,29 @@ NAME NAME NAME ENUM_REF
 
 	$$ = arg;
 }
+| NAME NAME POINTER NAME
+{
+	struct lt_arg *arg = NULL;
+	char *tokname;
+	size_t toklen, i;
+
+	toklen = strlen($1) + strlen($2) + 2;
+	tokname = alloca(toklen);
+	memset(tokname, 0, toklen);
+	snprintf(tokname, toklen, "%s %s", $1, $2);
+
+	for (i = 0; i < sizeof(typedef_mapping_table)/sizeof(typedef_mapping_table[0]); i++) {
+		if (!strcmp(typedef_mapping_table[i][0], tokname)) {
+			arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $4, 0, 1, NULL);
+			break;
+		}
+	}
+
+	if (!arg)
+                ERROR("unknown argument type[10] - %s\n", $1);
+
+	$$ = arg;
+}
 |
 NAME NAME ENUM_REF
 {
@@ -476,8 +459,11 @@ NAME NAME ENUM_REF
 NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
-	if (NULL == (arg = lt_args_getarg(scfg, $1, $3, 1, 1, $4)))
-		ERROR("unknown argument type[3] - %s\n", $1);
+
+	if (NULL == (arg = lt_args_getarg(scfg, $1, $3, 1, 1, $4))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", $3, 1, 1, $4)))
+			ERROR("unknown argument type[3] - %s\n", $1);
+	}
 
 	$$ = arg;
 }
@@ -485,6 +471,7 @@ NAME POINTER NAME ENUM_REF
 STRUCT NAME NAME
 {
 	struct lt_arg *arg;
+
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $3, 0, 1, NULL)))
 		ERROR("unknown argument type[4] - %s\n", $2);
 
@@ -494,6 +481,7 @@ STRUCT NAME NAME
 STRUCT NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
+
 	if (NULL == (arg = lt_args_getarg(scfg, $2, $4, 1, 1, $5))) {
 		if (NULL == (arg = lt_args_getarg(scfg, "void", $4, 1, 1, $5)))
 			ERROR("unknown argument type[5] - %s\n", $2);
@@ -505,6 +493,7 @@ STRUCT NAME POINTER NAME ENUM_REF
 NAME
 {
 	struct lt_arg *arg;
+
 	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 0, 1, NULL))) {
 
 		if (getenum(scfg, $1) == NULL)

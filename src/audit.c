@@ -48,6 +48,8 @@ __thread char *fault_reason = NULL;
 #ifdef TRANSFORMER_CRASH_PROTECTION
 __thread jmp_buf crash_insurance;
 __thread int jmp_set;
+__thread int last_operation = -1;
+__thread const char *last_symbol = NULL;
 #endif
 
 
@@ -122,21 +124,41 @@ static int sym_entry(const char *symname, void *ptr,
 	char *argbuf = "", *argdbuf = "";
 	struct timeval tv;
 	struct lt_symbol *sym = NULL;
-	int collapsed = 0, set_suppress_collapsed = 0;
+	int collapsed = 0, set_suppress_collapsed = 0, is_silent = 0;
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
 
 	// Make sure we keep track of recursive/repeated calls to ourselves.
-	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE)) {
+/*	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE)) {
 		if (!strcmp(suppress_while, symname))
 			suppress_nested++;
+
+		is_silent = 1;
+	} */
+	if (suppress_while[0] && (!strcmp(suppress_while, symname)))
+		suppress_nested++;
+	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE))
+		is_silent = 1;
+
+	if (is_silent) {
+		if (lt_sh(&cfg, global_symbols))
+			sym = lt_symbol_get(cfg.sh, ptr, symname);
+
+		if (sym && sym->args->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
+		#ifdef CONFIG_ARCH_HAVE_ARGS
+			argret = lt_args_sym_entry(cfg.sh, sym, regs, &argbuf, &argdbuf, is_silent);
+			free_argbuf(argret, argbuf, argdbuf);
+		#endif
+		}
 
 		return -1;
 	}
 
-	if (suppress_collapsed == COLLAPSED_TERSE)
+	if (suppress_collapsed == COLLAPSED_TERSE) {
 		collapsed = COLLAPSED_NESTED;
+	}
 	else {
+//	else if (collapsed != COLLAPSED_NESTED) {
 
 		if (cfg.flow_below_cnt && !check_flow_below(symname, 1))
 			return -1;
@@ -157,7 +179,7 @@ static int sym_entry(const char *symname, void *ptr,
 
 	#ifdef CONFIG_ARCH_HAVE_ARGS
 		argret = lt_sh(&cfg, args_enabled) ?
-			lt_args_sym_entry(cfg.sh, sym, regs, &argbuf, &argdbuf) : -1;
+			lt_args_sym_entry(cfg.sh, sym, regs, &argbuf, &argdbuf, is_silent) : -1;
 	#endif
 	}
 
@@ -185,15 +207,15 @@ static int sym_entry(const char *symname, void *ptr,
 	if (collapsed != COLLAPSED_NESTED)
 		indent_depth++;
 
+	if (set_suppress_collapsed)
+		suppress_collapsed = collapsed;
+
 	lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid),
 			indent_depth, collapsed,
 			symname, lib_to,
 			argbuf, argdbuf);
 
 	free_argbuf(argret, argbuf, argdbuf);
-
-	if (set_suppress_collapsed)
-		suppress_collapsed = collapsed;
 
 	return 0;
 }
@@ -206,7 +228,7 @@ static int sym_exit(const char *symname, void *ptr,
 	char *argbuf = "", *argdbuf = "";
 	struct timeval tv;
 	struct lt_symbol *sym = NULL;
-	int collapsed = 0;
+	int collapsed = 0, is_silent = 0;
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
 
@@ -217,11 +239,26 @@ static int sym_exit(const char *symname, void *ptr,
 			if (!suppress_nested) {
 				memset(suppress_while, 0, sizeof(suppress_while));
 				suppress_collapsed = 0;
-			}
+			} else
+				is_silent = 1;
 
 		}
 		else
-			return 0;
+			is_silent = 1;
+	}
+
+	if (is_silent) {
+		if (lt_sh(&cfg, global_symbols))
+			sym = lt_symbol_get(cfg.sh, ptr, symname);
+
+		if (sym && sym->args->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
+		#ifdef CONFIG_ARCH_HAVE_ARGS
+			argret = lt_args_sym_exit(cfg.sh, sym, (La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent);
+			free_argbuf(argret, argbuf, argdbuf);
+		#endif
+		}
+
+		return 0;
 	}
 
 	if (cfg.flow_below_cnt && !check_flow_below(symname, 0))
@@ -239,7 +276,7 @@ static int sym_exit(const char *symname, void *ptr,
 #ifdef CONFIG_ARCH_HAVE_ARGS
 	argret = lt_sh(&cfg, args_enabled) ?
 		lt_args_sym_exit(cfg.sh, sym,
-			(La_regs*) inregs, outregs, &argbuf, &argdbuf) : -1;
+			(La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent) : -1;
 #endif
 
 	if (lt_sh(&cfg, pipe)) {
@@ -254,6 +291,7 @@ static int sym_exit(const char *symname, void *ptr,
 				(char*) symname, lib_to, argbuf, argdbuf, collapsed);
 
 		free_argbuf(argret, argbuf, argdbuf);
+
 		return lt_fifo_send(&cfg, pipe_fd, buf, len);
 	}
 
@@ -262,9 +300,11 @@ static int sym_exit(const char *symname, void *ptr,
 			symname, lib_from,
 			argbuf, argdbuf);
 
-	indent_depth--;
+	if (indent_depth)
+		indent_depth--;
 
 	free_argbuf(argret, argbuf, argdbuf);
+
 	return 0;
 }
 
@@ -441,6 +481,10 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 	int ret = 0;
 
 	LA_ENTER(CODE_LOC_LA_PLTENTER);
+#ifdef TRANSFORMER_CRASH_PROTECTION
+	last_symbol = symname;
+	last_operation = 0;
+#endif
 
 	do {
 		CHECK_DISABLED(sym->st_value);
@@ -470,6 +514,10 @@ unsigned int pltexit(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 	struct link_map *ld = (struct link_map*) *defcook;
 
 	LA_ENTER(CODE_LOC_LA_PLTEXIT);
+#ifdef TRANSFORMER_CRASH_PROTECTION
+	last_symbol = symname;
+	last_operation = 1;
+#endif
 
 	do {
 		CHECK_PID(0);
@@ -485,10 +533,9 @@ unsigned int pltexit(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 }
 
 #ifdef TRANSFORMER_CRASH_PROTECTION
-static void crash_handler(int signo)
+void
+inline crash_handler_internal(void)
 {
-	PRINT_ERROR("Warning: caught potentially fatal signal: %d\n", signo);
-
 	if (jmp_set) {
 		switch (jmp_set) {
 			case CODE_LOC_LA_TRANSFORMER:
@@ -538,15 +585,53 @@ static void crash_handler(int signo)
 		PRINT_ERROR("Warning: signal appeared to be generated by internal latrace routine (%s).\n",
 			fault_reason);
 
+		if (last_operation >= 0)
+			PRINT_ERROR("Last known operation before crash: %s / %s\n", last_symbol,
+				(!last_operation ? "entry" : "exit"));
+
+		PRINT_ERROR("%s", "Exiting immediately.\n");
+		_exit(-1);
 	} else {
 		fault_reason = "unknown error";
-		PRINT_ERROR("%s", "Warning: signal appeared to be delivered outside of transformer code.\n");
+		PRINT_ERROR("%s", "Warning: signal appeared to be delivered outside of user custom code.\n");
+
+		if (last_operation >= 0)
+			PRINT_ERROR("Last known operation before crash: %s / %s\n", last_symbol,
+				(!last_operation ? "entry" : "exit"));
+
 		PRINT_ERROR("%s", "Exiting immediately.\n");
 		_exit(-1);
 	}
 
 	return;
 }
+
+#ifndef TRANSFORMER_CRASH_PROTECTION_ENHANCED
+static void crash_handler(int signo)
+{
+	PRINT_ERROR("Warning: caught potentially fatal signal: %d\n", signo);
+	crash_handler_internal();
+}
+#else
+static void
+crash_handler_si(int signo, siginfo_t *si, void *ucontext)
+{
+	const char *more_info = "additional information unavailable";
+
+	if (signo == SIGSEGV) {
+		if (si->si_code == SEGV_MAPERR)
+			more_info = "address not mapped to object";
+		else if (si->si_code == SEGV_ACCERR)
+			more_info = "invalid permissions for mapped object";
+		else
+			more_info = "unknown SIGSEGV violation subtype";
+	}
+
+	PRINT_ERROR("Warning: caught potentially fatal signal: %d (code = %d (%s), addr = %p)\n",
+		signo, si->si_code, more_info, si->si_addr);
+	crash_handler_internal();
+}
+#endif
 #endif
 
 int setup_crash_handlers(void)
@@ -557,9 +642,15 @@ int setup_crash_handlers(void)
 	printf("Setting up crash handler...\n");
 
 	memset(&sa, 0, sizeof(struct sigaction));
-	sa.sa_handler = crash_handler;
-	sigemptyset (&sa.sa_mask);
+	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
+
+#ifdef TRANSFORMER_CRASH_PROTECTION_ENHANCED
+	sa.sa_sigaction = crash_handler_si;
+	sa.sa_flags |= SA_SIGINFO;
+#else
+	sa.sa_handler = crash_handler;
+#endif
 
 	if ((sigaction(SIGILL, &sa, NULL) == -1) || (sigaction(SIGBUS, &sa, NULL) == -1) ||
 		(sigaction(SIGSEGV, &sa, NULL) == -1)) {
