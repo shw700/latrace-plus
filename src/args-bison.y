@@ -107,6 +107,7 @@ do { \
 }
 
 %type <s>         NAME
+%type <s>         POINTER
 %type <s>         FILENAME
 %type <head>      STRUCT_DEF
 %type <head>      ENUM_DEF
@@ -319,7 +320,11 @@ TYPEDEF NAME NAME NAME ';'
 |
 TYPEDEF NAME POINTER NAME ';'
 {
-	int ret = lt_args_add_typedef(scfg, $2, $4, 1);
+	int ret;
+	int ptrno = strlen($3);
+
+	free($3);
+	ret = lt_args_add_typedef(scfg, $2, $4, ptrno);
 	CHK_TYPEDEF(ret, $2, $4, 1);
 }
 
@@ -420,7 +425,9 @@ NAME NAME NAME ENUM_REF
 	struct lt_arg *arg = NULL;
 	char *tokname;
 	size_t toklen, i;
+	int ptrno = strlen($3);
 
+	free($3);
 	toklen = strlen($1) + strlen($2) + 2;
 	tokname = alloca(toklen);
 	memset(tokname, 0, toklen);
@@ -428,7 +435,7 @@ NAME NAME NAME ENUM_REF
 
 	for (i = 0; i < sizeof(typedef_mapping_table)/sizeof(typedef_mapping_table[0]); i++) {
 		if (!strcmp(typedef_mapping_table[i][0], tokname)) {
-			arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $4, 0, 1, NULL);
+			arg = lt_args_getarg(scfg, typedef_mapping_table[i][1], $4, ptrno, 1, NULL);
 			break;
 		}
 	}
@@ -459,9 +466,12 @@ NAME NAME ENUM_REF
 NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
+	int ptrno = strlen($2);
 
-	if (NULL == (arg = lt_args_getarg(scfg, $1, $3, 1, 1, $4))) {
-		if (NULL == (arg = lt_args_getarg(scfg, "void", $3, 1, 1, $4)))
+	free($2);
+
+	if (NULL == (arg = lt_args_getarg(scfg, $1, $3, ptrno, 1, $4))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", $3, ptrno, 1, $4)))
 			ERROR("unknown argument type[3] - %s\n", $1);
 	}
 
@@ -481,9 +491,12 @@ STRUCT NAME NAME
 STRUCT NAME POINTER NAME ENUM_REF
 {
 	struct lt_arg *arg;
+	int ptrno = strlen($3);
 
-	if (NULL == (arg = lt_args_getarg(scfg, $2, $4, 1, 1, $5))) {
-		if (NULL == (arg = lt_args_getarg(scfg, "void", $4, 1, 1, $5)))
+	free($3);
+
+	if (NULL == (arg = lt_args_getarg(scfg, $2, $4, ptrno, 1, $5))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", $4, ptrno, 1, $5)))
 			ERROR("unknown argument type[5] - %s\n", $2);
 	}
 
@@ -510,8 +523,12 @@ NAME
 NAME POINTER
 {
 	struct lt_arg *arg;
-	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 1, 1, NULL))) {
-		if (NULL == (arg = lt_args_getarg(scfg, "void", "_anon_", 1, 1, NULL)))
+	int ptrno = strlen($2);
+
+	free ($2);
+
+	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", ptrno, 1, NULL))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", "_anon_", ptrno, 1, NULL)))
 			ERROR("unknown argument type[7] - %s\n", $1);
 	}
 
@@ -521,8 +538,12 @@ NAME POINTER
 STRUCT NAME POINTER
 {
 	struct lt_arg *arg;
-	if (NULL == (arg = lt_args_getarg(scfg, $2, "_anon_", 1, 1, NULL))) {
-		if (NULL == (arg = lt_args_getarg(scfg, "void", "_anon_", 1, 1, NULL)))
+	int ptrno = strlen($3);
+
+	free($3);
+
+	if (NULL == (arg = lt_args_getarg(scfg, $2, "_anon_", ptrno, 1, NULL))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", "_anon_", ptrno, 1, NULL)))
 			ERROR("unknown argument type[8] - %s\n", $2);
 	}
 

@@ -726,7 +726,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 		pval = get_value(cfg, arg, regs, 0);
 
-		if (pval && arg->latrace_custom_struct_transformer) {
+		if (pval && arg->latrace_custom_struct_transformer && (!arg->fmt || !*(arg->fmt))) {
 			void *pvald = *((void**) pval);
 			char *saved_args_buf;
 			size_t left, saved_arglen, saved_totlen;
@@ -810,19 +810,21 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 {
 	struct lt_arg *arg;
 	void *pval;
+	int needs_callstack = 0;
 
 	arg = asym->args[LT_ARGS_RET];
 	pval = get_value(cfg, arg, regs, 1);
+	needs_callstack = ((asym->args[LT_ARGS_RET]->latrace_custom_func_transformer != NULL) ||
+		(asym->args[LT_ARGS_RET]->latrace_custom_func_intercept != NULL));
 
-	if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer ||
-		asym->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
+	if (needs_callstack || asym->args[LT_ARGS_RET]->latrace_custom_struct_transformer) {
 		void **inargs = NULL;
 		void *retval = pval;
 		size_t inargs_size = 0;
 		int tres = -1;
 
 //		if (!silent && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
-		if (exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
+		if (needs_callstack && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
 			PRINT_ERROR("%s", "Error retrieving function entry arguments from transformer call stack\n");
 			inargs = NULL;
 			inargs_size = 0;
@@ -854,6 +856,21 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			} else {
 				tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(inargs,
 					inargs_size, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, retval);
+			}
+
+			CRASH_EPILOGUE();
+		}
+
+		if (!silent && (tres < 0) && asym->args[LT_ARGS_RET]->latrace_custom_struct_transformer && pval &&
+			(!asym->args[LT_ARGS_RET]->fmt || !*(asym->args[LT_ARGS_RET]->fmt))) {
+			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
+
+			if (fault_reason) {
+				fprintf(stderr, "Error: caught fatal condition in custom struct transformer exit for %s: %s\n",
+					asym->name, fault_reason);
+				fault_reason = NULL;
+			} else {
+				tres = asym->args[LT_ARGS_RET]->latrace_custom_struct_transformer(*((void**) pval), data->args_buf+data->args_totlen, data->args_len-data->args_totlen);
 			}
 
 			CRASH_EPILOGUE();

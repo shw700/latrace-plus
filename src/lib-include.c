@@ -65,6 +65,7 @@ static FILE* open_include_dir(struct lt_config_shared *cfg, char *file,
 static FILE* open_include(struct lt_config_shared *cfg, char *file)
 {
 	FILE *f;
+	char *env_dir;
 
 	/* we got an absolute path */
 	if ((NULL != (f = fopen(file, "r")))) {
@@ -90,6 +91,12 @@ static FILE* open_include(struct lt_config_shared *cfg, char *file)
 	/* not in LT_CONF_DIR directory, give it a chance
 	   inside of the LT_CONF_HEADERS_DIR directory */
 	f = open_include_dir(cfg, file, LT_CONF_HEADERS_DIR);
+	if (f)
+		return f;
+
+	if ((env_dir = getenv("LT_HEADERS_DIR")))
+		f = open_include_dir(cfg, file, env_dir);
+
 	if (f)
 		return f;
 

@@ -1003,9 +1003,13 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		fmt = strchr(name, '/');
 	}
 
-	if (bitmask && (bitmask < fmt))
+	if (bitmask && fmt && (bitmask < fmt))
 		modifier = bitmask - 1;
-	else if (fmt && (fmt < bitmask))
+	else if (fmt && bitmask && (fmt < bitmask))
+		modifier = fmt - 1;
+	else if (bitmask)
+		modifier = bitmask - 1;
+	else if (fmt)
 		modifier = fmt - 1;
 	else if (name)
 		modifier = (char *)&name[strlen(name)-1];
@@ -1171,7 +1175,20 @@ int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base,
 
 int lt_args_init(struct lt_config_shared *cfg)
 {
-	char *file = LT_CONF_HEADERS_FILE;
+	static char *file = NULL;
+
+	if (!file) {
+		char *env_dir = getenv("LT_HEADERS_DIR");
+
+		if (env_dir) {
+			size_t fsize = strlen(env_dir) + 16;
+
+			file = malloc(fsize);
+			memset(file, 0, fsize);
+			snprintf(file, fsize, "%s/latrace.h", env_dir);
+		} else
+			file = LT_CONF_HEADERS_FILE;
+	}
 
 	if (!hcreate_r(LT_ARGS_TAB, &cfg->args_tab)) {
 		PRINT_ERROR("Failed to create hash table: %s", strerror(errno));
@@ -1261,6 +1278,7 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 {
 	int len = 0, alen = *arglen;
 	int namelen = strlen(arg->name);
+	int is_char = 0;
 
 	PRINT_VERBOSE(cfg, 1, "\t arg '%s %s', pval %p, len %d, pointer %d, dtype %d, type_id %d\n",
 			arg->type_name, arg->name, pval, alen, arg->pointer, arg->dtype, arg->type_id);
@@ -1301,8 +1319,9 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 	/* Get enum resolve for pointers now, the rest 
 	   POD is done in ARGS_SPRINTF macro. The char 
 	   pointers need special handling later. */
-	if ((arg->pointer) &&
-	    (arg->type_id != LT_ARGS_TYPEID_CHAR)) {
+//	is_char = (arg->type_id == LT_ARGS_TYPEID_CHAR) || (arg->type_id == LT_ARGS_TYPEID_UCHAR);
+	is_char = (arg->type_id == LT_ARGS_TYPEID_CHAR);
+	if ((arg->pointer && !is_char) || ((arg->pointer > 1) && is_char)) {
 
 		void *ptr = *((void**) pval);
 
@@ -1356,10 +1375,17 @@ do {                                                                 \
 		len = snprintf(argbuf, alen, "%s", lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt));
 	} else if (arg->fmt && (!strcmp(arg->fmt, "o"))) {
 		ARGS_SPRINTF("0%o", unsigned int);
+	} else if (arg->fmt && (!strcmp(arg->fmt, "d"))) {
+		ARGS_SPRINTF("%d", signed int);
+	} else if (arg->fmt && (!strcmp(arg->fmt, "u"))) {
+		ARGS_SPRINTF("%d", unsigned int);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "x"))) {
 		ARGS_SPRINTF("0x%lx", unsigned long);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "p"))) {
-		ARGS_SPRINTF("%p", void *);
+		if (*((void **)pval) == NULL)
+			len = snprintf(argbuf, alen, "NULL");
+		else
+			ARGS_SPRINTF("%p", void *);
 	} else if (arg->fmt && (strchr(arg->fmt, 'b'))) {
 		char *tok;
 #define DEFAULT_BINARY_WIDTH 4

@@ -21,12 +21,10 @@ bugs
 	- test statistics counts
 	- fifo reading more intelligent
 	- detailed arguments buffer memory management (now fixed size)
-	- environment variables to the include path
 	- check we dont cross all the hardcoded limits
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- * latrace crash if struct transformer overrides definition of struct
-	- * prevent multiple deferences of char *, i.e. char ** and char ***
 	- ridiculous unknown bug handling __longjmp_chk()
 
 Other:
@@ -37,7 +35,5 @@ Other:
 	- * New library loads should trigger symbol load
 	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten
 	- * get rid of old bm_enum declaration type
-	- * /p switch should allow any struct pointer to be displayed as a memory address
 	- Should probably reap old thread_buffers
-	- * User override of transformers dir with environment variable
 	- * Provide updated include files

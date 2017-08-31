@@ -238,7 +238,7 @@ int glob_err(const char *epath, int eerrno) {
 #define FUNC_INTERCEPT_PREFIX	"latrace_func_intercept_"
 int init_custom_handlers(struct lt_config_audit *cfg)
 {
-	static char globdir[sizeof(LT_CONF_TRANSFORMERS_DIR)+8];
+	static char *globdir = NULL;
 	glob_t rglob;
 	size_t i;
 	int ret;
@@ -255,8 +255,19 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 	}
 	#endif
 
-	if (!globdir[0])
-		snprintf(globdir, sizeof(globdir), "%s/*.so", LT_CONF_TRANSFORMERS_DIR);
+	if (!globdir) {
+		const char *gsrc = getenv("LT_TRANSFORMERS_DIR");
+		size_t gdsize;
+
+		if (!gsrc)
+			gsrc = LT_CONF_TRANSFORMERS_DIR;
+
+		gdsize = strlen(gsrc) + 8;
+
+		globdir = malloc(gdsize);
+		memset(globdir, 0, gdsize);
+		snprintf(globdir, gdsize, "%s/*.so", gsrc);
+	}
 
 	ret = glob(globdir, GLOB_ERR, glob_err, &rglob);
 
