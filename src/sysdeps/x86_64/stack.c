@@ -677,7 +677,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			CRASH_EPILOGUE();
 		}
 
-		if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
+		if (!silent && asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
 			if (fault_reason) {

@@ -27,7 +27,7 @@ bugs
 	- info doc (produce html, pdf... outputs)
 	- * latrace crash if struct transformer overrides definition of struct
 	- * prevent multiple deferences of char *, i.e. char ** and char ***
-
+	- ridiculous unknown bug handling __longjmp_chk()
 
 Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
@@ -40,3 +40,4 @@ Other:
 	- * /p switch should allow any struct pointer to be displayed as a memory address
 	- Should probably reap old thread_buffers
 	- * User override of transformers dir with environment variable
+	- * Provide updated include files

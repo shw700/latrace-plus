@@ -137,7 +137,8 @@ static int sym_entry(const char *symname, void *ptr,
 	} */
 	if (suppress_while[0] && (!strcmp(suppress_while, symname)))
 		suppress_nested++;
-	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE))
+//	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE))
+	if (suppress_while[0])
 		is_silent = 1;
 
 	if (is_silent) {
@@ -243,7 +244,7 @@ static int sym_exit(const char *symname, void *ptr,
 				is_silent = 1;
 
 		}
-		else
+		else if (suppress_nested > 0)
 			is_silent = 1;
 	}
 
