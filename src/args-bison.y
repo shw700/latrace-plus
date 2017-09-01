@@ -382,7 +382,7 @@ ARGS ',' DEF
 		struct lt_list_head *h;
 		struct lt_arg *arg = NULL;
 
-		if (NULL == (arg = lt_args_getarg(scfg, "int", "_anon_", 0, 1, $1)))
+		if (NULL == (arg = lt_args_getarg(scfg, "int", ANON_PREFIX, 0, 1, $1)))
 			ERROR("unknown error parsing anonymous enum instance of type: %s\n", $1);
 
 		GET_LIST_HEAD(h);
@@ -507,12 +507,12 @@ NAME
 {
 	struct lt_arg *arg;
 
-	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", 0, 1, NULL))) {
+	if (NULL == (arg = lt_args_getarg(scfg, $1, ANON_PREFIX, 0, 1, NULL))) {
 
 		if (getenum(scfg, $1) == NULL)
 			ERROR("unknown argument type[6a] - %s\n", $1);
 
-		if (NULL == (arg = lt_args_getarg(scfg, "int", "_anon_", 0, 1, $1)))
+		if (NULL == (arg = lt_args_getarg(scfg, "int", ANON_PREFIX, 0, 1, $1)))
 			ERROR("unknown argument type[6b] - %s\n", $1);
 
 	}
@@ -527,8 +527,8 @@ NAME POINTER
 
 	free ($2);
 
-	if (NULL == (arg = lt_args_getarg(scfg, $1, "_anon_", ptrno, 1, NULL))) {
-		if (NULL == (arg = lt_args_getarg(scfg, "void", "_anon_", ptrno, 1, NULL)))
+	if (NULL == (arg = lt_args_getarg(scfg, $1, ANON_PREFIX, ptrno, 1, NULL))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", ANON_PREFIX, ptrno, 1, NULL)))
 			ERROR("unknown argument type[7] - %s\n", $1);
 	}
 
@@ -542,8 +542,8 @@ STRUCT NAME POINTER
 
 	free($3);
 
-	if (NULL == (arg = lt_args_getarg(scfg, $2, "_anon_", ptrno, 1, NULL))) {
-		if (NULL == (arg = lt_args_getarg(scfg, "void", "_anon_", ptrno, 1, NULL)))
+	if (NULL == (arg = lt_args_getarg(scfg, $2, ANON_PREFIX, ptrno, 1, NULL))) {
+		if (NULL == (arg = lt_args_getarg(scfg, "void", ANON_PREFIX, ptrno, 1, NULL)))
 			ERROR("unknown argument type[8] - %s\n", $2);
 	}
 

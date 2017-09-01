@@ -23,6 +23,8 @@ The "/" switch can be used at the end of a regular function variable declaration
 
 `/x`	Hexadecimal representation
 
+`/h`	Human readable (unsigned) integer - displays commas
+
 `/b`	Binary string (hexdump) (defaults to 4 bytes in length)
 
 `/#b`	Binary string dump of # bytes length

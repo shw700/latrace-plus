@@ -870,6 +870,7 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 	struct lt_args_sym *sym;
 	struct lt_arg *arg;
 	int i = 0;
+	size_t argno = 0;
 
 	PRINT_VERBOSE(cfg, 3, "got symbol '%s %s'\n",
 			ret->type_name, ret->name);
@@ -899,6 +900,16 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 		PRINT_VERBOSE(cfg, 3, "\t '%s %s'\n",
 				arg->type_name, arg->name);
 		sym->args[i++] = arg;
+		argno++;
+
+		if (!strcmp(arg->name, ANON_PREFIX)) {
+			char nbuf[32];
+
+			snprintf(nbuf, sizeof(nbuf), "%s%zu", ANON_PREFIX, argno);
+			free(arg->name);
+			arg->name = strdup(nbuf);
+		}
+
 	}
 
 	e.key = sym->name;
@@ -1381,6 +1392,21 @@ do {                                                                 \
 		ARGS_SPRINTF("%d", unsigned int);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "x"))) {
 		ARGS_SPRINTF("0x%lx", unsigned long);
+	} else if (arg->fmt && (!strcmp(arg->fmt, "h"))) {
+		char numbuf[32], *nptr;
+
+		memset(numbuf, 0, sizeof(numbuf));
+		sprintf(numbuf, "%u", *((unsigned int*)pval));
+		len = strlen(numbuf);
+		nptr = numbuf + len - 3;
+
+		while (nptr > numbuf) {
+			memmove(nptr+1, nptr, len+1 - (nptr - numbuf));
+			*nptr = ',';
+			nptr -= 3;
+		}
+
+		strncpy(argbuf, numbuf, alen);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "p"))) {
 		if (*((void **)pval) == NULL)
 			len = snprintf(argbuf, alen, "NULL");

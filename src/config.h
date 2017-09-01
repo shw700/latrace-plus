@@ -481,6 +481,8 @@ do { \
 #define DEMANGLE(sym, d)
 #endif
 
+#define ANON_PREFIX	"_anon_"
+
 
 #if defined(__x86_64)
 #include "sysdeps/x86_64/args.h"

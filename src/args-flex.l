@@ -80,7 +80,7 @@ whitespace	([ \t])
 "bm_enum"		{ return BM_ENUM; }
 "enum_bm"		{ return BM_ENUMX; }
 "typedef"		{ return TYPEDEF; }
-{name}[!~^]?(\/[opxdu])?	{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
+{name}[!~^]?(\/[opxduh])?	{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
 "\*"+			{ lt_args_lval.s = strdup(lt_args_text); return POINTER; }
 ")"			{ return ')'; }
 "("			{ return '('; }
