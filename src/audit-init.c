@@ -435,6 +435,8 @@ int audit_init(int argc, char **argv, char **env)
 		return -1;
 
 	if (init_custom_handlers(&cfg) < 0) {
+		PRINT_ERROR("%s", "Custom handlers initialization subsystem failed!\n");
+		return -1;
 	}
 
 #ifdef CONFIG_ARCH_HAVE_ARGS

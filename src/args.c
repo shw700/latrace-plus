@@ -1006,6 +1006,7 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 			const char *name, int pointer, int create, char *enum_name)
 {
 	struct lt_arg *arg;
+	void *xfm_func = NULL;
 	char *bitmask = NULL, *fmt = NULL, *name_copy = NULL, *modifier = NULL;
 	int collapsed = 0;
 
@@ -1056,6 +1057,14 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		name = name_copy;
 	}
 
+	if (create) {
+		ENTRY e, *ep;
+		e.key = (char *)type;
+
+		if (hsearch_r(e, FIND, &ep, &args_struct_xfm_tab))
+			xfm_func = ep->data;
+	}
+
 	do {
 		ENTRY e, *ep;
 
@@ -1088,7 +1097,7 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 		e.key = (char *)type;
 
-		if (hsearch_r(e, FIND, &ep, &args_struct_xfm_tab)) {
+		if (name && xfm_func) {
 			arg = find_arg(cfg, "custom_user_struct_transformer", args_def_pod, LT_ARGS_DEF_POD_NUM, create);
 
 			if (arg) {
@@ -1104,6 +1113,9 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 	if (!create)
 		return arg;
+
+	if (xfm_func)
+		arg->latrace_custom_struct_transformer = xfm_func;
 
 	/* Find out the enum definition if the enum 
 	   name is provided. */
@@ -1290,6 +1302,7 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 	int len = 0, alen = *arglen;
 	int namelen = strlen(arg->name);
 	int is_char = 0;
+	int force_type_id = -1;
 
 	PRINT_VERBOSE(cfg, 1, "\t arg '%s %s', pval %p, len %d, pointer %d, dtype %d, type_id %d\n",
 			arg->type_name, arg->name, pval, alen, arg->pointer, arg->dtype, arg->type_id);
@@ -1332,6 +1345,13 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 	   pointers need special handling later. */
 //	is_char = (arg->type_id == LT_ARGS_TYPEID_CHAR) || (arg->type_id == LT_ARGS_TYPEID_UCHAR);
 	is_char = (arg->type_id == LT_ARGS_TYPEID_CHAR);
+
+	if (arg->pointer && arg->fmt && !strcmp(arg->fmt, "s")) {
+		is_char = 1;
+		force_type_id = LT_ARGS_TYPEID_CHAR;
+	} else
+		force_type_id = arg->type_id;
+
 	if ((arg->pointer && !is_char) || ((arg->pointer > 1) && is_char)) {
 
 		void *ptr = *((void**) pval);
@@ -1441,7 +1461,7 @@ do {                                                                 \
 
 		strcat(argbuf, "\"");
 	} else {
-		switch(arg->type_id) {
+		switch(force_type_id) {
 		case LT_ARGS_TYPEID_SHORT:  ARGS_SPRINTF("%hd", short); break;
 		case LT_ARGS_TYPEID_USHORT: ARGS_SPRINTF("%hu", unsigned short); break;
 		case LT_ARGS_TYPEID_INT:    ARGS_SPRINTF("%d", int); break;
@@ -1502,7 +1522,7 @@ do {                                                                 \
 
 	}
 
-	if (LT_ARGS_DTYPE_STRUCT == arg->dtype) {
+	if ((force_type_id == arg->type_id) && (LT_ARGS_DTYPE_STRUCT == arg->dtype)) {
 		if (pval)
 			len = snprintf(argbuf, alen, "v(%p)", pval);
 		else

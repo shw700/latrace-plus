@@ -24,7 +24,6 @@ bugs
 	- check we dont cross all the hardcoded limits
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
-	- * latrace crash if struct transformer overrides definition of struct
 	- ridiculous unknown bug handling __longjmp_chk()
 
 Other:
