@@ -127,9 +127,14 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 		return lt_stats_sym(cfg, t, msym);
 
 	if (FIFO_MSG_TYPE_ENTRY == msym->h.type) {
+		t->indent_depth++;
 
-		if (msym->collapsed != COLLAPSED_NESTED)
-			t->indent_depth++;
+		/*
+		 * Ugly, but an empty name is how we tweak the call stack depth
+		 * without also doing anything else.
+		 */
+		if (!*(msym->data+msym->sym))
+			return 0;
 
 		lt_out_entry(cfg->sh, &msym->h.tv, msym->h.tid,
 				t->indent_depth, msym->collapsed,
@@ -140,15 +145,18 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 
 	} else if (FIFO_MSG_TYPE_EXIT == msym->h.type) {
 
-		lt_out_exit(cfg->sh, &msym->h.tv, msym->h.tid,
-				t->indent_depth, msym->collapsed,
-				msym->data + msym->sym,
-				msym->data + msym->lib,
-				msym->data + msym->arg,
-				msym->data + msym->argd);
+		if (msym->collapsed != COLLAPSED_NESTED) {
+			lt_out_exit(cfg->sh, &msym->h.tv, msym->h.tid,
+					t->indent_depth, msym->collapsed,
+					msym->data + msym->sym,
+					msym->data + msym->lib,
+					msym->data + msym->arg,
+					msym->data + msym->argd);
+		}
 
 		if (t->indent_depth)
 			t->indent_depth--;
+
 	}
 
 	return 0;

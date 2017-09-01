@@ -34,6 +34,7 @@ typedef struct thread_buffer {
 	pid_t tid;
 	char *buf;
 	struct thread_buffer *next;
+	int last_nested;
 } thread_buffer_t;
 
 thread_buffer_t *thread_buffers = NULL;
@@ -134,12 +135,13 @@ sprintf_cat(char *buf, size_t bufsize, char *fmt, ...)
 }
 
 static void
-buffer_output_data(pid_t tid, const char *output)
+buffer_output_data(pid_t tid, const char *output, int nest_level, int do_prefix)
 {
 	thread_buffer_t *tb;
 	char *outbuf;
 	size_t nlen = 0;
 	int was_empty = 0;
+	int nested = 1;
 
 	if (!output || !*output)
 		return;
@@ -151,14 +153,17 @@ buffer_output_data(pid_t tid, const char *output)
 		tb = tb->next;
 
 	if (tb && tb->buf)
-		nlen = strlen(tb->buf);
+		nlen += strlen(tb->buf);
 	else
 		was_empty = 1;
+
+	if (do_prefix)
+		nlen += 8;
 
 	nlen += strlen(output) + 1;
 
 	if (was_empty)
-		outbuf = strdup(output);
+		outbuf = malloc(nlen);
 	else
 		outbuf = realloc(tb->buf, nlen);
 
@@ -166,6 +171,24 @@ buffer_output_data(pid_t tid, const char *output)
 		PRINT_ERROR("%s", "Error: unable to allocate memory for output buffer");
 		pthread_mutex_unlock(&threadbuf_lock);
 		return;
+	}
+
+	if (was_empty)
+		strcpy(outbuf, output);
+	else if (nest_level > tb->last_nested)
+		nested = 1;
+	else if (tb->last_nested > nest_level)
+		nested = -1;
+	else
+		nested = 0;
+
+	if (do_prefix) {
+		if (nested > 0)
+			strcat(outbuf, " -> ");
+		else if (nested < 0)
+			strcat(outbuf, " | ");
+		else if (!was_empty)
+			strcat(outbuf, ", ");
 	}
 
 	if (!was_empty)
@@ -186,6 +209,7 @@ buffer_output_data(pid_t tid, const char *output)
 	}
 
 	tb->buf = outbuf;
+	tb->last_nested = nest_level;
 	pthread_mutex_unlock(&threadbuf_lock);
 	return;
 }
@@ -207,6 +231,7 @@ pop_output_data(pid_t tid)
 	else {
 		result = tb->buf;
 		tb->buf = NULL;
+		tb->last_nested = 0;
 
 		if (tb != thread_buffers) {
 			tb->next = thread_buffers;
@@ -239,19 +264,22 @@ int lt_out_entry(struct lt_config_shared *cfg,
 		memset(outbuf, 0, sizeof(outbuf));
 	} */
 
+	if (collapsed && !symname)
+		return 0;
+
 	if (collapsed == COLLAPSED_NESTED) {
 		int demangled = 0;
 
 		if (cfg->demangle)
 			DEMANGLE(symname, demangled);
 
-		PRINT_DATA(buffered, "-> %s()", symname);
+		PRINT_DATA(buffered, "%s()", symname);
 
 		if (demangled)
 			free((char *)symname);
 
 		if (outbuf) {
-			buffer_output_data(tid, outbuf);
+			buffer_output_data(tid, outbuf, indent_depth, 1);
 			free(outbuf);
 		}
 
@@ -326,7 +354,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	fflush(NULL);
 
 	if (outbuf) {
-		buffer_output_data(tid, outbuf);
+		buffer_output_data(tid, outbuf, indent_depth, 0);
 		free(outbuf);
 	}
 

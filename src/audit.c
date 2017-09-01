@@ -148,17 +148,19 @@ static int sym_entry(const char *symname, void *ptr,
 		if (sym && sym->args->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
 		#ifdef CONFIG_ARCH_HAVE_ARGS
 			argret = lt_args_sym_entry(cfg.sh, sym, regs, &argbuf, &argdbuf, is_silent);
-			free_argbuf(argret, argbuf, argdbuf);
 		#endif
 		}
 
-		return -1;
-	}
+		if ((suppress_collapsed != COLLAPSED_NESTED) && (suppress_collapsed != COLLAPSED_TERSE))
+			symname = "";
 
-	if (suppress_collapsed == COLLAPSED_TERSE) {
 		collapsed = COLLAPSED_NESTED;
 	}
-	else {
+
+	if (!is_silent && (suppress_collapsed == COLLAPSED_TERSE)) {
+		collapsed = COLLAPSED_NESTED;
+	}
+	else if (!is_silent) {
 //	else if (collapsed != COLLAPSED_NESTED) {
 
 		if (cfg.flow_below_cnt && !check_flow_below(symname, 1))
@@ -199,25 +201,24 @@ static int sym_entry(const char *symname, void *ptr,
 
 		free_argbuf(argret, argbuf, argdbuf);
 
-		if (set_suppress_collapsed)
+		if (!is_silent && set_suppress_collapsed)
 			suppress_collapsed = collapsed;
 
 		return lt_fifo_send(&cfg, pipe_fd, buf, len);
 	}
 
-	if (collapsed != COLLAPSED_NESTED)
-		indent_depth++;
+	indent_depth++;
 
-	if (set_suppress_collapsed)
+	if (!is_silent && set_suppress_collapsed)
 		suppress_collapsed = collapsed;
 
-	lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid),
-			indent_depth, collapsed,
-			symname, lib_to,
-			argbuf, argdbuf);
+	/* If symname is empty then all we care about is preserving the call stack depth */
+	if (*symname) {
+		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), indent_depth, collapsed,
+			symname, lib_to, argbuf, argdbuf);
+	}
 
 	free_argbuf(argret, argbuf, argdbuf);
-
 	return 0;
 }
 
@@ -255,37 +256,36 @@ static int sym_exit(const char *symname, void *ptr,
 		if (sym && sym->args->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
 		#ifdef CONFIG_ARCH_HAVE_ARGS
 			argret = lt_args_sym_exit(cfg.sh, sym, (La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent);
-			free_argbuf(argret, argbuf, argdbuf);
 		#endif
 		}
 
-		return 0;
-	}
+		collapsed = COLLAPSED_NESTED;
+	} else {
 
-	if (cfg.flow_below_cnt && !check_flow_below(symname, 0))
-		return 0;
+		if (cfg.flow_below_cnt && !check_flow_below(symname, 0))
+			return 0;
 
-	if (lt_sh(&cfg, timestamp) || lt_sh(&cfg, counts))
-		gettimeofday(&tv, NULL);
+		if (lt_sh(&cfg, timestamp) || lt_sh(&cfg, counts))
+			gettimeofday(&tv, NULL);
 
-	if (lt_sh(&cfg, global_symbols))
-		sym = lt_symbol_get(cfg.sh, ptr, symname);
+		if (lt_sh(&cfg, global_symbols))
+			sym = lt_symbol_get(cfg.sh, ptr, symname);
 
-	if (sym && sym->collapsed)
-		collapsed = sym->collapsed;
+		if (sym && sym->collapsed)
+			collapsed = sym->collapsed;
 
 #ifdef CONFIG_ARCH_HAVE_ARGS
-	argret = lt_sh(&cfg, args_enabled) ?
-		lt_args_sym_exit(cfg.sh, sym,
-			(La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent) : -1;
+		argret = lt_sh(&cfg, args_enabled) ?
+			lt_args_sym_exit(cfg.sh, sym,
+				(La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent) : -1;
 #endif
+	}
 
 	if (lt_sh(&cfg, pipe)) {
 		char buf[FIFO_MSG_MAXLEN];
 		int len;
-		int collapsed = 0;
 
-		if (sym && sym->collapsed)
+		if (!is_silent && sym && sym->collapsed)
 			collapsed = sym->collapsed;
 
 		len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_EXIT, &tv,
@@ -305,7 +305,6 @@ static int sym_exit(const char *symname, void *ptr,
 		indent_depth--;
 
 	free_argbuf(argret, argbuf, argdbuf);
-
 	return 0;
 }
 

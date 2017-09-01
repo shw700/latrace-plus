@@ -16,6 +16,7 @@ char *(*sym_lookup_bitmask_by_class)(void *ignored, const char *, unsigned long,
 
 
 int latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t bufsize);
+int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 
 
 void misc_transformer_init()
@@ -69,6 +70,24 @@ get_signal_name(int signo) {
 	return NULL;
 }
 
+int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size_t blen, void *retval)
+{
+	int *retint;
+	char **name;
+
+        if (!retval || (argscnt != 2))
+                return -1;
+
+        retint = (int *)retval;
+        name = (char **)args[0];
+
+	if (*retint != 0)
+		return -1;
+
+	snprintf(buf, blen, "\"%s\"", *name);
+        return 0;
+}
+
 int
 latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t blen)
 {
@@ -85,7 +104,7 @@ latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t blen)
 	memset(handlerbuf, 0, sizeof(handlerbuf));
 	call_lookup_bitmask_by_class("sa_flag", obj->sa_flags, NULL, flagsbuf, sizeof(flagsbuf));
 
-	for (s = 0; s < _NSIG; s++) {
+	for (s = 1; s < _NSIG; s++) {
 
 		if (sigismember(&obj->sa_mask, s)) {
 			char signo_buf[16];
