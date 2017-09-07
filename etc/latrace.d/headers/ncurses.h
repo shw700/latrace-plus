@@ -332,3 +332,5 @@ char*   _tracecchar_t(void *a);
 char*   _tracecchar_t2(int a, void *b);
 char*   _tracemouse(void *e);
 void    trace(u_int a);
+
+int _nc_baudrate~(int OSpeed);

@@ -105,6 +105,7 @@ __gid_t getegid~();
 
 int getgroups(int size, void *list);
 int group_member(__gid_t gid);
+struct group *getgrgid^(gid_t gid);
 int setuid(__uid_t uid);
 int setreuid(__uid_t ruid, __uid_t euid);
 int seteuid(__uid_t uid);

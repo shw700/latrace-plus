@@ -82,6 +82,12 @@ static FILE* open_include(struct lt_config_shared *cfg, char *file)
 	PRINT_VERBOSE(cfg, 1, "open failed [%s]: %s\n",
 			file, strerror(errno));
 
+	if ((env_dir = getenv("LT_HEADERS_DIR")))
+		f = open_include_dir(cfg, file, env_dir);
+
+	if (f)
+		return f;
+
 	/* not an absolute name, give it a chance
 	   inside of the LT_CONF_DIR directory */
 	f = open_include_dir(cfg, file, LT_CONF_DIR);
@@ -91,16 +97,7 @@ static FILE* open_include(struct lt_config_shared *cfg, char *file)
 	/* not in LT_CONF_DIR directory, give it a chance
 	   inside of the LT_CONF_HEADERS_DIR directory */
 	f = open_include_dir(cfg, file, LT_CONF_HEADERS_DIR);
-	if (f)
-		return f;
-
-	if ((env_dir = getenv("LT_HEADERS_DIR")))
-		f = open_include_dir(cfg, file, env_dir);
-
-	if (f)
-		return f;
-
-	return NULL;
+	return f;
 }
 
 int lt_inc_open(struct lt_config_shared *cfg, struct lt_include *inc,

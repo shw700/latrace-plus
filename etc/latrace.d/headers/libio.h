@@ -12,7 +12,7 @@ int __overflow~(_IO_FILE *f, int a);
 
 
 int _IO_getc(_IO_FILE *fp);
-int _IO_putc(int c, _IO_FILE *fp);
+int _IO_putc~(int c, _IO_FILE *fp);
 int _IO_feof(_IO_FILE *fp);
 int _IO_ferror(_IO_FILE *fp);
 

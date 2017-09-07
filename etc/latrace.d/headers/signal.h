@@ -112,5 +112,5 @@ int     sighold(int sig = SIGNALS);
 int     sigrelse(int sig = SIGNALS);
 int     sigignore(int sig = SIGNALS);
 void*   sigset(int sig = SIGNALS, void *disp);
-int     __libc_current_sigrtmin();
-int     __libc_current_sigrtmax();
+int     __libc_current_sigrtmin~();
+int     __libc_current_sigrtmax~();

@@ -12,6 +12,16 @@ int __snprintf_chk~(char *__s, size_t __n, int __flag, size_t __slen, const char
 int ___vsnprintf_chk~(char *s, size_t maxlen, int flags, size_t slen, const char *format, va_list args);
 int ___vsnprintf_chk(char *s, size_t maxlen, int flags, size_t slen, const char *format, void *args);
 void *__rawmemchr~(const void *__s, int __c);
+int __freading~(FILE *__fp);
+size_t __fpending~(FILE *__fp);
+
+enum locking_type {
+	FSETLOCKING_QUERY = 0,
+	FSETLOCKING_INTERNAL,
+	FSETLOCKING_BYCALLER
+};
+
+int __fsetlocking~(FILE *__fp, int __type=locking_type);
 
 long __fdelt_chk~(long __d);
 
@@ -51,3 +61,10 @@ unsigned int __ns_get16~(unsigned char *buf);
 unsigned long __ns_get32~(unsigned char *buf);
 int __ns_name_unpack~(const u_char *msg, const u_char *eom, const u_char *src, u_char *dst, size_t dstsiz);
 int __ns_name_ntop~(const u_char *src, char *dst/p, size_t dstsiz);
+
+int is_selinux_enabled~(void);
+int is_selinux_mls_enabled~(void);
+
+PROCTAB* openproc!(int flags/x, ...);
+void closeproc~(PROCTAB* PT);
+proc_t* readproc!(PROCTAB *PT, proc_t *return_buf);

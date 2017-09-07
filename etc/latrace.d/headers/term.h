@@ -37,4 +37,4 @@ char*   tgoto(char *s, int a, int b);
 int     tgetent(char *s, char *a);
 int     tgetflag(char *s);
 int     tgetnum(char *s);
-int     tputs(char *s, int a, void *f);
+int     tputs!(char *s, int a, void *f);

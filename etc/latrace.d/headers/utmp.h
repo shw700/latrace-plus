@@ -17,7 +17,7 @@ void updwtmp(char *wtmp_file, utmp *utmp);
 int utmpname(char *file);
 
 
-utmp* getutent();
+utmp* getutent~();
 void  setutent();
 void  endutent();
 utmp* getutid(utmp *id);

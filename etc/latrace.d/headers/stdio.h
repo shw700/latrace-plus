@@ -74,7 +74,7 @@ int putw(int w, FILE *stream);
 char* fgets(char *s, int n, FILE *stream);
 char* gets(char *s);
 char* fgets_unlocked~(char *s, int n, FILE *stream);
-size_t __getdelim(void *lineptr, size_t *n, int delimiter, FILE *stream);
+size_t __getdelim~(void *lineptr, size_t *n, int delimiter, FILE *stream);
 size_t getdelim(void *lineptr, size_t *n, int delimiter, FILE *stream);
 size_t getline(void *lineptr, size_t *n, FILE *stream);
 int fputs(char *s, FILE *stream);

@@ -14,6 +14,11 @@ int fstatat64(int fd, char *file, stat64 *buf, int flag);
 int lstat(char *file, stat *buf);
 int lstat64(char *file, stat64 *buf);
 
+int statfs~(const char *path, struct statfs *buf);
+int statfs64~(const char *path, struct tstatfs64 *buf);
+int fstatfs~(int fd, struct statfs *buf);
+int fstatfs64~(int fd, struct statfs64 *buf);
+
 
 int chmod(char *file, __mode_t mode);
 int lchmod(char *file, __mode_t mode);
