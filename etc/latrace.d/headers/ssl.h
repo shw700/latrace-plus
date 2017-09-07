@@ -81,7 +81,7 @@ int SSL_CTX_check_private_key(void *ctx);
 int SSL_check_private_key(void *ssl);
 void CRYPTO_lock~(int mode=crypto_lock_mode, int n, const char *file, int line);
 int SSL_read(void *ssl, void *buf, int num);
-int SSL_write~(SSL *ssl, void *buf, int num);
+int SSL_write!(SSL *ssl, void *buf, int num);
 int SSL_get_fd~(const SSL *ssl);
 int SSL_get_rfd(void *ssl);
 int SSL_get_wfd(void *ssl);
@@ -128,7 +128,7 @@ int BIO_read~(BIO *b, void *buf, int len);
 int BIO_gets~(BIO *b, char *buf, int size);
 int BIO_write~(BIO *b, const void *buf, int len);
 int BIO_puts~(BIO *b, const char *buf);
-int BIO_printf~(void *bio, const char *format, ...);
+int BIO_printf!(void *bio, const char *format, ...);
 int BIO_snprintf~(char *buf/p, size_t n, const char *format, ...);
 BIO *BIO_new_socket~(int sock, int close_flag);
 BIO *BIO_new_fp~(FILE *stream, int flags=bio_new_flags);
@@ -216,7 +216,7 @@ enum_bm conf_mflags {
 CONF *NCONF_new~(CONF_METHOD *meth);
 void NCONF_free!(CONF *conf);
 CONF_METHOD *NCONF_default~(void);
-int NCONF_load~(CONF *conf, const char *file, long *eline);
+int NCONF_load!(CONF *conf, const char *file, long *eline);
 int CONF_modules_load!(const CONF *cnf, const char *appname, unsigned long flags=conf_mflags);
 int CONF_module_add~(const char *name, pfn ifunc, pfn ffunc);
 
@@ -234,7 +234,7 @@ void *lh_insert~(_LHASH *lh, void *data);
 void *lh_retrieve~(_LHASH *lh, const void *data);
 unsigned long lh_strhash~(const char *c);
 unsigned long lh_num_items~(const _LHASH *lh);
-void lh_doall~(_LHASH *lh, pfn func);
+void lh_doall!(_LHASH *lh, pfn func);
 void lh_doall_arg~(_LHASH *lh, pfn fn, void *arg);
 
 //long bn_mul_add_words(void *rp, void *ap, int num, long w);
@@ -263,7 +263,7 @@ _STACK *sk_new_null~(void);
 void sk_free~(_STACK *st);
 int sk_insert~(_STACK *st, void *data, int where);
 int sk_push~(_STACK *st, void *data);
-void sk_pop_free~(_STACK *st, pfn func);
+void sk_pop_free!(_STACK *st, pfn func);
 int sk_num~(const _STACK *st);
 void sk_value~(const _STACK *st, int i);
 void sk_sort~(_STACK *sk);
@@ -271,8 +271,8 @@ _STACK *sk_dup~(_STACK *st);
 
 const char *RAND_file_name~(char *buf/p, size_t num);
 int RAND_load_file~(const char *filename, long max_bytes);
-int RAND_bytes~(unsigned char *buf, int num);
-int RAND_pseudo_bytes~(unsigned char *buf, int num);
+int RAND_bytes!(unsigned char *buf, int num);
+int RAND_pseudo_bytes!(unsigned char *buf, int num);
 //void RAND_add~(const void *buf, int num, double entropy);
 int RAND_status~(void);
 

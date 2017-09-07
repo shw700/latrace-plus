@@ -27,6 +27,8 @@
 
 #include "config.h"
 
+
+static __thread size_t nsuppressed = 0;
 static char spaces[] = "                                                                                                                                                                           ";
 
 
@@ -264,8 +266,10 @@ int lt_out_entry(struct lt_config_shared *cfg,
 		memset(outbuf, 0, sizeof(outbuf));
 	} */
 
-	if (collapsed && !symname)
+	if (collapsed && !symname) {
+		nsuppressed++;
 		return 0;
+	}
 
 	if (collapsed == COLLAPSED_NESTED) {
 		int demangled = 0;
@@ -372,8 +376,21 @@ int lt_out_exit(struct lt_config_shared *cfg,
 	int demangled = 0;
 
 	if ((prefix = pop_output_data(tid))) {
-		fprintf(cfg->fout, "%s", prefix);
+
+		if (nsuppressed) {
+			char *eol = "";
+
+			if (prefix[strlen(prefix)-1] == '\n') {
+				prefix[strlen(prefix)-1] = 0;
+				eol = "\n";
+			}
+
+			fprintf(cfg->fout, "%s {%zu suppressions}%s", prefix, nsuppressed, eol);
+		} else
+			fprintf(cfg->fout, "%s", prefix);
+
 		free(prefix);
+		nsuppressed = 0;
 	}
 
 	if (!*argbuf && (!cfg->braces))

@@ -107,6 +107,7 @@ int lcong48_r(unsigned short int param[7], struct drand48_data *buffer);
 
 
 void*   walloc~(size_t size);
+void*   malloc~(size_t size);
 void*   calloc~(size_t nmemb, size_t size);
 void*   realloc~(void *ptr, size_t size);
 void    free~(void *ptr);
@@ -142,7 +143,7 @@ char*   realpath(char *name, char *resolved);
 
 
 void*   bsearch(void *key, void *base, size_t nmemb, size_t size, void *compar);
-void    qsort(void *base, size_t nmemb, size_t size, void *compar);
+void    qsort!(void *base, size_t nmemb, size_t size, pfn compar);
 
 
 int     abs(int x);

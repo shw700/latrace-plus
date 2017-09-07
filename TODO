@@ -37,4 +37,3 @@ Other:
 	- Should probably reap old thread_buffers to prevent memory leakage
 	- * add non-collapsible functions (_setjmp)
 	- * tersely collapsed functions should not display nested functions of bare/fully collapsed functions
-	- * print nested suppression count

@@ -127,18 +127,20 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 		return lt_stats_sym(cfg, t, msym);
 
 	if (FIFO_MSG_TYPE_ENTRY == msym->h.type) {
+		char *symname = NULL;
+
 		t->indent_depth++;
 
 		/*
 		 * Ugly, but an empty name is how we tweak the call stack depth
 		 * without also doing anything else.
 		 */
-		if (!*(msym->data+msym->sym))
-			return 0;
+		if (*(msym->data+msym->sym))
+			symname = msym->data + msym->sym;
 
 		lt_out_entry(cfg->sh, &msym->h.tv, msym->h.tid,
 				t->indent_depth, msym->collapsed,
-				msym->data + msym->sym,
+				symname,
 				msym->data + msym->lib,
 				msym->data + msym->arg,
 				msym->data + msym->argd);
