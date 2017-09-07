@@ -1,11 +1,11 @@
 /* arch-specific */
 #include "sysdeps/x86_64/latrace.h"
 
-/* miscelaneous functions */
-#include "misc.h"
-
 /* miscelaneous typedefs */
 #include "typedefs.h"
+
+/* miscelaneous functions */
+#include "misc.h"
 
 /* /usr/include/arpa/inet.h */
 #include "inet.h"
@@ -97,8 +97,11 @@
 /* /etc/latrace.d/mman.h */
 #include "mman.h"
 
-/* openssl stuff */
+#include "other.h"
+
+#include "cpp.h"
+
 #include "ssl.h"
 
-/* custom bitmask enumerations */
-#include "enum.h"
+/* Other system routines */
+#include "sys.h"

@@ -8,7 +8,7 @@ typedef size_t _IO_size_t;
 
 int __underflow(_IO_FILE *f);
 int __uflow(_IO_FILE *f);
-int __overflow(_IO_FILE *f, int a);
+int __overflow~(_IO_FILE *f, int a);
 
 
 int _IO_getc(_IO_FILE *fp);

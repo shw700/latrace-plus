@@ -25,3 +25,5 @@ typedef u_int __mode_t;
 typedef u_int mode_t;
 typedef u_short __dev_t;
 typedef u_short dev_t;
+
+typedef void * va_list;

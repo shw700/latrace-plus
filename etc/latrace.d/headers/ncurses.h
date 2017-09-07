@@ -3,7 +3,7 @@
 
 typedef int     attr_t;
 typedef attr_t  chtype;
-typedef u_char  bool;
+//typedef unsigned int bool;
 
 bool    is_term_resized(int a, int b);
 char*   keybound (int a, int b);

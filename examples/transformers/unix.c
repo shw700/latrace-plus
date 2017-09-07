@@ -16,6 +16,7 @@ char *(*sym_lookup_bitmask_by_class)(void *ignored, const char *, unsigned long,
 
 
 int latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t bufsize);
+int latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t bufsize);
 int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 
 
@@ -86,6 +87,42 @@ int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size
 
 	snprintf(buf, blen, "\"%s\"", *name);
         return 0;
+}
+
+int
+latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t blen)
+{
+	char sigbuf[512];
+	int s;
+
+	if (obj == NULL)
+		return -1;
+
+	memset(sigbuf, 0, sizeof(sigbuf));
+
+	for (s = 1; s < _NSIG; s++) {
+
+		if (sigismember(obj, s)) {
+			char signo_buf[16];
+			const char *signame = get_signal_name(s);
+
+			if (!signame) {
+				snprintf(signo_buf, sizeof(signo_buf), "%d", s);
+				signame = signo_buf;
+			}
+
+			if (sigbuf[0])
+				strcat(sigbuf, ",");
+			strcat(sigbuf, signame);
+		}
+
+	}
+
+	if (sigbuf[0] && sigbuf[strlen(sigbuf)-1] == ',')
+		sigbuf[strlen(sigbuf)-1] = 0;
+
+	snprintf(buf, blen, "[%s]", sigbuf);
+	return 0;
 }
 
 int

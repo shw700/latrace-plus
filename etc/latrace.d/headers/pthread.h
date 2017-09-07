@@ -74,7 +74,7 @@ int pthread_cancel(pthread_t th);
 void pthread_testcancel();
 
 
-int pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *mutexattr);
+int pthread_mutex_init~(pthread_mutex_t *mutex, pthread_mutexattr_t *attr);
 int pthread_mutex_destroy(pthread_mutex_t *mutex);
 int pthread_mutex_trylock(pthread_mutex_t *mutex);
 int pthread_mutex_lock(pthread_mutex_t *mutex);
@@ -121,6 +121,7 @@ int pthread_rwlockattr_setkind_np(pthread_rwlockattr_t *attr, int pref);
 int pthread_cond_init(pthread_cond_t *cond, pthread_condattr_t *cond_attr);
 int pthread_cond_destroy(pthread_cond_t *cond);
 int pthread_cond_signal(pthread_cond_t *cond);
+int pthread_sigmask~(int how=sigmask_how, const sigset_t *set, const sigset_t *oldset/p);
 int pthread_cond_broadcast(pthread_cond_t *cond);
 int pthread_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex);
 int pthread_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mutex, timespec *abstime);

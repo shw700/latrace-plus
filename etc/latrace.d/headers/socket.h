@@ -51,7 +51,7 @@ enum SOCK_TYPE {
 
 int socket(int domain = PF_TYPE, int type = SOCK_TYPE, int protocol);
 int socketpair(int domain = PF_TYPE, int type = SOCK_TYPE, int protocol, void *fds);
-int bind(int fd, void *addr, socklen_t len);
+int bind~(int fd, void *addr, socklen_t len);
 int getsockname(int fd, void *addr, socklen_t *len);
 int connect(int fd, void *addr, socklen_t len);
 int getpeername(int fd, void *addr, socklen_t *len);
@@ -68,7 +68,7 @@ size_t recvmsg(int fd, void *message, int flags);
 
 
 int getsockopt(int fd, int level, int optname, void *optval, socklen_t *optlen);
-int setsockopt(int fd, int level, int optname, void *optval, socklen_t optlen);
+int setsockopt~(int fd, int level, int optname, void *optval, socklen_t optlen);
 
 
 int listen(int fd, int n);

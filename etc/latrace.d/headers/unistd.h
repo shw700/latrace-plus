@@ -1,6 +1,31 @@
 
 /* /usr/include/unistd.h */
 
+enum sysconf_name {
+	_PC_LINK_MAX,
+	_PC_MAX_CANON,
+	_PC_MAX_INPUT,
+	_PC_NAME_MAX,
+	_PC_PATH_MAX,
+	_PC_PIPE_BUF,
+	_PC_CHOWN_RESTRICTED,
+	_PC_NO_TRUNC,
+	_PC_VDISABLE,
+	_PC_SYNC_IO,
+	_PC_ASYNC_IO,
+	_PC_PRIO_IO,
+	_PC_SOCK_MAXBUF,
+	_PC_FILESIZEBITS,
+	_PC_REC_INCR_XFER_SIZE,
+	_PC_REC_MAX_XFER_SIZE,
+	_PC_REC_MIN_XFER_SIZE,
+	_PC_REC_XFER_ALIGN,
+	_PC_ALLOC_SIZE_MIN,
+	_PC_SYMLINK_MAX,
+	_PC_2_SYMLINKS
+};
+
+
 
 int access(char *name, int type);
 int euidaccess(char *name, int type);
@@ -8,11 +33,11 @@ int eaccess(char *name, int type);
 int faccessat(int fd, char *file, int type, int flag);
 
 
-__off_t   lseek(int fd, __off_t offset, int whence);
-__off64_t lseek64(int fd, __off64_t offset, int whence);
+__off_t   lseek~(int fd, __off_t offset, int whence);
+__off64_t lseek64~(int fd, __off64_t offset, int whence);
 
 
-int    close(int fd);
+int    close~(int fd);
 size_t read(int fd, void *buf, size_t nbytes);
 size_t write(int fd, void *buf, size_t n);
 size_t pread(int fd, void *buf, size_t nbytes, __off_t offset);
@@ -42,8 +67,8 @@ char* get_current_dir_name();
 char* getwd(char *buf);
 
 
-int dup(int fd);
-int dup2(int fd, int fd2);
+int dup~(int fd);
+int dup2~(int fd, int fd2);
 
 
 int execve(char *path, void *argv, void *envp);
@@ -59,23 +84,23 @@ int    nice(int inc);
 void   _exit(int status);
 long   pathconf(char *path, int name);
 long   fpathconf(int fd, int name);
-long   sysconf(int name);
+long   sysconf~(int name=sysconf_name);
 size_t confstr(int name, char *buf, size_t len);
 
 
-__pid_t getpid();
-__pid_t getppid();
-__pid_t getpgrp();
+__pid_t getpid~();
+__pid_t getppid~();
+__pid_t getpgrp~();
 __pid_t __getpgid(__pid_t pid);
 __pid_t getpgid(__pid_t pid);
 int     setpgid(__pid_t pid, __pid_t pgid);
 int     setpgrp();
 __pid_t setsid();
 __pid_t getsid(__pid_t pid);
-__uid_t getuid();
-__uid_t geteuid();
-__gid_t getgid();
-__gid_t getegid();
+__uid_t getuid~();
+__uid_t geteuid~();
+__gid_t getgid~();
+__gid_t getegid~();
 
 
 int getgroups(int size, void *list);
@@ -98,7 +123,7 @@ __pid_t vfork();
 
 char* ttyname(int fd);
 int ttyname_r(int fd, char *buf, size_t buflen);
-int isatty(int fd);
+int isatty~(int fd);
 int ttyslot();
 
 
@@ -120,7 +145,7 @@ int     getlogin_r(char *name, size_t name_len);
 int     setlogin(char *name);
 
 
-int gethostname(char *name, size_t len);
+int gethostname~(char *name/p, size_t len);
 int sethostname(char *name, size_t len);
 int sethostid(long id);
 int getdomainname(char *name, size_t len);
@@ -144,8 +169,8 @@ char* getpass(char *prompt);
 int   fsync(int fd);
 long  gethostid();
 void  sync();
-int   getpagesize();
-int   getdtablesize();
+int   getpagesize~();
+int   getdtablesize~();
 
 
 int truncate(char *file, __off_t length);
@@ -154,8 +179,8 @@ int ftruncate(int fd, __off_t length);
 int ftruncate64(int fd, __off64_t length);
 
 
-int   brk(void *addr);
-void* sbrk(u_int delta);
+int   brk~(void *addr);
+void* sbrk~(u_int delta);
 long  syscall(long sysno = SYSCALL_NO);
 
 int   lockf(int fd, int cmd, __off_t len);

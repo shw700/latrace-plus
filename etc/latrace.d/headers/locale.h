@@ -2,7 +2,7 @@
 /* /usr/include/locale.h */
 
 
-char*      setlocale(int category, char *locale);
+char*      setlocale~(int category, char *locale);
 __locale_t newlocale(int category_mask, char *locale, __locale_t __base);
 __locale_t duplocale(__locale_t __dataset);
 void       freelocale(__locale_t dataset);

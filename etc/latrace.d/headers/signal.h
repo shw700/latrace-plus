@@ -55,6 +55,12 @@ bm_enum sa_flag {
 	SA_RESETHAND  =  0x80000000
 };
 
+enum sigmask_how {
+	SIG_BLOCK   = 0,
+	SIG_UNBLOCK = 1,
+	SIG_SETMASK = 2
+};
+
 
 void*   __sysv_signal(int sig = SIGNALS, void *handler = SIGNAL_HANDLER);
 void*   sysv_signal(int sig = SIGNALS, void *handler = SIGNAL_HANDLER);
@@ -79,22 +85,21 @@ int     sigblock(int mask);
 
 int     sigsetmask(int mask);
 int     siggetmask();
-int     sigemptyset(void *set);
-int     sigfillset(void *set);
-int     sigaddset(void *set, int signo = SIGNALS);
-int     sigdelset(void *set, int signo = SIGNALS);
-int     sigismember(void *set, int signo = SIGNALS);
-int     sigisemptyset(void *set);
-int     sigandset(void *set, void *left, void *right);
-int     sigorset(void *set, void *left, void *right);
-int     sigprocmask(int how, void *set, void *oset);
-int     sigsuspend(void *set);
-int     sigaction(int sig = SIGNALS, void *act, void *oact);
-//int     sigaction(int sig = SIGNALS, struct sigaction *act, struct sigaction *oact);
-int     sigpending(void *set);
-int     sigwait(void *set, int *sig);
-int     sigwaitinfo(void *set, void *info);
-int     sigtimedwait(void *set, void *info, void *__timeout);
+int     sigemptyset~(sigset_t *set/p);
+int     sigfillset~(sigset_t *set/p);
+int     sigaddset~(sigset_t *set, int signo = SIGNALS);
+int     sigdelset~(sigset_t *set, int signo = SIGNALS);
+int     sigismember(const sigset_t *set, int signo = SIGNALS);
+int     sigisemptyset(const sigset_t *set);
+int     sigandset(sigset_t *dest, const sigset_t *left, const sigset_t *right);
+int     sigorset(sigset_t *dest, const sigset_t *left, const sigset_t *right);
+int     sigprocmask~(int how=sigmask_how, sigset_t *set, sigset_t *oset/p);
+int     sigsuspend~(const sigset_t *mask);
+int     sigaction~(SIGNALS signum, struct sigaction *act, struct sigaction *oldact/p);
+int     sigpending~(sigset_t *set);
+int     sigwait(const sigset_t *set, int *sig);
+int     sigwaitinfo(const sigset_t *set, siginfo_t *info);
+int     sigtimedwait(const sigset_t *set, sigset_t *info, const struct timespec *timeout);
 
 
 int     sigqueue(__pid_t pid, int sig = SIGNALS, u_int val);

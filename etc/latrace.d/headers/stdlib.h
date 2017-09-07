@@ -1,13 +1,14 @@
-
 /* /usr/include/stdlib.h */
 
-size_t __ctype_get_mb_cur_max(void);
+size_t __ctype_get_mb_cur_max~(void);
 
-int   atoi(char *nptr);
-long  atol(char *nptr);
-long  atoll(char *nptr);
-long  strtol(char *nptr, void *endptr, int base);
+int   atoi~(char *nptr);
+long  atol~(char *nptr);
+long  atoll~(char *nptr);
+long  strtol~(char *nptr, void *endptr, int base);
 
+
+unsigned long strtoul~(const char *nptr, char **endptr/p, int base);
 
 /*      we dont do big numbers so far...
 
@@ -56,8 +57,8 @@ int     random_r(struct random_data *buf, int32_t *result);
 int     srandom_r(u_int seed, struct random_data *buf);
 int     initstate_r(u_int seed, char *statebuf, size_t statelen, struct random_data *buf);
 int     setstate_r(char *statebuf, struct random_data *buf);
-int     rand(void);
-void    srand(u_int seed);
+int     rand~(void);
+void    srand~(u_int seed);
 int     rand_r(u_int *seed);
 
 
@@ -105,10 +106,10 @@ int lcong48_r(unsigned short int param[7], struct drand48_data *buffer);
 */
 
 
-void*   malloc(size_t size);
-void*   calloc(size_t nmemb, size_t size);
-void*   realloc(void *ptr, size_t size);
-void    free(void *ptr);
+void*   walloc~(size_t size);
+void*   calloc~(size_t nmemb, size_t size);
+void*   realloc~(void *ptr, size_t size);
+void    free~(void *ptr);
 void    cfree(void *ptr);
 void*   valloc(size_t size);
 
@@ -119,7 +120,7 @@ int     atexit(void *func);
 int     on_exit(void *func, void *arg);
 void    exit(int status);
 void    _Exit(int status);
-char*   getenv(char *name);
+char*   getenv~(char *name);
 char*   secure_getenv (char *name);
 int     putenv(char *string);
 int     setenv(char *name, char *value, int replace);
@@ -195,6 +196,7 @@ int     mbtowc(wchar_t *pwc, char *s, size_t n);
 int     wctomb(char *s, wchar_t wchar);
 size_t  mbstowcs(wchar_t *pwcs, char *s, size_t n);
 size_t  wcstombs(char *s, wchar_t *pwcs, size_t n);
+size_t  mbrtowc~(wchar_t *pwc, const char *s, size_t n, mbstate_t *ps);
 
 
 int     rpmatch(char *response);
@@ -207,4 +209,4 @@ char*   ptsname(int fd);
 int     ptsname_r(int fd, char *buf, size_t buflen);
 int     getpt(void);
 int     getloadavg(void *ptr, int nelem);
-void    __cxa_finalize(void *ptr);
+void    __cxa_finalize~(void *d);

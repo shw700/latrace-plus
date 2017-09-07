@@ -10,7 +10,7 @@ typedef void timer_t;
 typedef void itimerspec;
 
 
-time_t time(time_t *timer);
+time_t time~(time_t *timer);
 
 
 double difftime(time_t time1, time_t time0);
@@ -20,7 +20,7 @@ time_t mktime(tm *tp);
 
 
 size_t strftime(char *s, size_t maxsize, char *format, tm *tp);
-char*  strptime(char *s, char *fmt, tm *tp);
+char*  strptime~(char *s, char *fmt, tm *tp);
 size_t strftime_l(char *s, size_t maxsize, char *format, tm *tp, __locale_t __loc);
 char*  strptime_l(char *s, char *fmt, tm *tp, __locale_t __loc);
 
@@ -43,12 +43,12 @@ int nanosleep(timespec *requested_time, timespec *remaining);
 
 
 int    stime(time_t *when);
-time_t timegm(tm *tp);
+time_t timegm~(tm *tp);
 time_t timelocal(tm *tp);
 
 
 int clock_getres(clockid_t clock_id, timespec *res);
-int clock_gettime(clockid_t clock_id, timespec *tp);
+int clock_gettime~(clockid_t clock_id, timespec *tp);
 int clock_settime(clockid_t clock_id, timespec *tp);
 int clock_nanosleep(clockid_t clock_id, int flags, timespec *req, timespec *rem);
 int clock_getcpuclockid(pid_t pid, clockid_t *clock_id);
@@ -63,3 +63,6 @@ int timer_getoverrun(timer_t timerid);
 
 tm* getdate(char *string);
 int getdate_r(char *string, tm *resbufp);
+
+int gettimeofday~(struct timeval *tv/p, struct timezone *tz);
+int settimeofday~(const struct timeval *tv, const struct timezone *tz);

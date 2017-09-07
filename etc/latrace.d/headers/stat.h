@@ -40,14 +40,14 @@ int utimensat(int fd, char *path, void *times, int flags);
 int futimens(int fd, void *times);
 
 
-int __fxstat(int ver, int fildes, stat *stat_buf);
-int __xstat(int ver, char *filename, stat *stat_buf);
+int __fxstat~(int ver, int fildes, stat *stat_buf);
+int __xstat~(int ver, char *filename, stat *stat_buf);
 int __lxstat(int ver, char *filename, stat *stat_buf);
-int __fxstatat(int ver, int fildes, char *filename, stat *stat_buf, int flag);
-int __fxstat64(int ver, int fildes, stat64 *stat_buf);
-int __xstat64(int ver, char *filename, stat64 *stat_buf);
+int __fxstatat~(int ver, int fildes, char *filename, stat *stat_buf, int flag);
+int __fxstat64~(int ver, int fildes, stat64 *stat_buf);
+int __xstat64~(int ver, char *filename, stat64 *stat_buf);
 int __lxstat64(int ver, char *filename, stat64 *stat_buf);
-int __fxstatat64(int ver, int fildes, char *filename, stat64 *stat_buf, int flag);
+int __fxstatat64~(int ver, int fildes, char *filename, stat64 *stat_buf, int flag);
 
 
 int __xmknod(int ver, char *path, __mode_t mode, __dev_t *dev);

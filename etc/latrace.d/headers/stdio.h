@@ -13,8 +13,8 @@ char *tmpnam_r(char *s);
 char *tempnam(char *dir, char *pfx);
 
 
-int fclose(FILE *stream);
-int fflush(FILE *stream);
+int fclose~(FILE *stream);
+int fflush~(FILE *stream);
 int fflush_unlocked(FILE *stream);
 int fcloseall(void);
 
@@ -32,7 +32,7 @@ FILE* open_memstream(void *bufloc, size_t *sizeloc);
 
 
 void setbuf(FILE *stream, char *buf);
-int  setvbuf(FILE *stream, char *buf, int modes, size_t n);
+int  setvbuf~(FILE *stream, char *buf/p, int modes, size_t n);
 void setbuffer(FILE *stream, char *buf, size_t size);
 void setlinebuf(FILE *stream);
 
@@ -52,7 +52,7 @@ int vdprintf(int fd, char *fmt);
 int dprintf(int fd, char *fmt);
 int fscanf(FILE *stream, char *format);
 int scanf(char *format);
-int sscanf(char *s, char *format);
+int sscanf~(char *s, char *format);
 int vfscanf(FILE *s, char *format);
 int vscanf(char *format);
 int vsscanf(char *s, char *format);
@@ -63,7 +63,7 @@ int getchar();
 int getc_unlocked(FILE *stream);
 int getchar_unlocked();
 int fgetc_unlocked(FILE *__stream);
-int fputc(int c, FILE *stream);
+int fputc~(int c, FILE *stream);
 int putc(int c, FILE *stream);
 int putchar(int c);
 int fputc_unlocked(int c, FILE *stream);
@@ -73,7 +73,7 @@ int getw(FILE *stream);
 int putw(int w, FILE *stream);
 char* fgets(char *s, int n, FILE *stream);
 char* gets(char *s);
-char* fgets_unlocked(char *s, int n, FILE *stream);
+char* fgets_unlocked~(char *s, int n, FILE *stream);
 size_t __getdelim(void *lineptr, size_t *n, int delimiter, FILE *stream);
 size_t getdelim(void *lineptr, size_t *n, int delimiter, FILE *stream);
 size_t getline(void *lineptr, size_t *n, FILE *stream);
@@ -84,7 +84,7 @@ int ungetc(int c, FILE *stream);
 
 size_t  fread(void *ptr, size_t size, size_t n, FILE *stream);
 size_t  fwrite(void *ptr, size_t size, size_t n, FILE *s);
-int     fputs_unlocked(char *s, FILE *stream);
+int     fputs_unlocked~(char *s, FILE *stream);
 size_t  fread_unlocked(void *ptr, size_t size, size_t n, FILE *stream);
 size_t  fwrite_unlocked(void *ptr, size_t size, size_t n, FILE *stream);
 int     fseek(FILE *stream, long off, int whence);
@@ -94,7 +94,7 @@ long    ftell(FILE *stream);
 void    rewind(FILE *stream);
 int     fseeko(FILE *stream, __off_t off, int whence);
 __off_t ftello(FILE *stream);
-int     fgetpos(FILE *stream, fpos_t *pos);
+int     fgetpos~(FILE *stream, fpos_t *pos);
 int     fsetpos(FILE *stream, fpos_t *pos);
 
 
@@ -111,17 +111,17 @@ int fsetpos64(FILE *stream, fpos64_t *pos);
 
 
 void clearerr(FILE *stream);
-int  feof(FILE *stream);
+int  feof~(FILE *stream);
 int  ferror(FILE *stream);
 void clearerr_unlocked(FILE *stream);
-int  feof_unlocked(FILE *stream);
+int  feof_unlocked~(FILE *stream);
 int  ferror_unlocked(FILE *stream);
 
 
 void perror(char *s);
 
 
-int     fileno(FILE *stream);
+int     fileno~(FILE *stream);
 int     fileno_unlocked(FILE *stream);
 FILE*   popen(char *command, char *modes);
 int     pclose(FILE *stream);

@@ -71,7 +71,7 @@ struct protoent* getprotoent();
 struct protoent* getprotobyname(char *name);
 struct protoent* getprotobynumber(int proto);
 int getprotoent_r(struct protoent* result_buf, char *buf, size_t buflen, void *result);
-int getprotobyname_r(char *name, struct protoent *result_buf, char *buf, size_t buflen, void *result);
+int getprotobyname_r(char *name, struct protoent *result_buf, char *buf/p, size_t buflen, void *result);
 int getprotobynumber_r(int proto, struct protoent* result_buf, char *buf, size_t buflen, void *result);
 
 

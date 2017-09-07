@@ -2,9 +2,11 @@
 /* /usr/include/ctype.h */
 
 
-void*   __ctype_b_loc(void);
-void*   __ctype_tolower_loc(void);
-void*   __ctype_toupper_loc (void);
+void*   __ctype_b_loc~(void);
+void*   __ctype_tolower_loc~(void);
+
+//typedef int __int32_t;
+__int32_t **__ctype_toupper_loc~(void);
 
 
 int isctype(int c, int mask);

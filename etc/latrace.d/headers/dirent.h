@@ -7,8 +7,8 @@ DIR* fdopendir(int fd);
 int  closedir(DIR *dirp);
 
 
-void* readdir(DIR *dirp);
-void* readdir64(DIR *dirp);
+void* readdir~(DIR *dirp);
+void* readdir64~(DIR *dirp);
 int   readdir_r(DIR *dirp, void *entry, void *result);
 int   readdir64_r(DIR *dirp, void *entry, void *result);
 
