@@ -2,15 +2,14 @@
 
 int __cxa_atexit~(pfn func, void * arg, void * dso_handle);
 int __cxa_finalize~(void * d);
-int __cxa_guard_acquire(__guard*);
-void __cxa_guard_release(__guard*);
+int __cxa_guard_acquire~(__guard*);
+void __cxa_guard_release~(__guard*);
 
 void __ctype_init(void);
 int __printf_chk~(int flag, const char * format);
 int __fprintf_chk~(FILE *__stream, int __flag, char *__format, ...);
 int __snprintf_chk~(char *__s, size_t __n, int __flag, size_t __slen, const char *__format, ...);
-int ___vsnprintf_chk~(char *s, size_t maxlen, int flags, size_t slen, const char *format, va_list args);
-int ___vsnprintf_chk(char *s, size_t maxlen, int flags, size_t slen, const char *format, void *args);
+int __vsnprintf_chk~(char *s, size_t maxlen, int flags, size_t slen, const char *format, va_list args);
 void *__rawmemchr~(const void *__s, int __c);
 int __freading~(FILE *__fp);
 size_t __fpending~(FILE *__fp);
@@ -68,3 +67,68 @@ int is_selinux_mls_enabled~(void);
 PROCTAB* openproc!(int flags/x, ...);
 void closeproc~(PROCTAB* PT);
 proc_t* readproc!(PROCTAB *PT, proc_t *return_buf);
+
+
+enum el_op {
+	EL_PROMPT     = 0,
+	EL_TERMINAL   = 1,
+	EL_EDITOR     = 2,
+	EL_SIGNAL     = 3,
+	EL_BIND       = 4,
+	EL_TELLTC     = 5,
+	EL_SETTC      = 6,
+	EL_ECHOTC     = 7,
+	EL_SETTY      = 8,
+	EL_ADDFN      = 9,
+	EL_HIST       = 10,
+	EL_EDITMODE   = 11,
+	EL_RPROMPT    = 12,
+	EL_GETCFN     = 13,
+	EL_CLIENTDATA = 14,
+	EL_UNBUFFERED = 15,
+	EL_PREP_TERM  = 16,
+	EL_GETTC      = 17,
+	EL_GETFP      = 18,
+	EL_SETFP      = 19,
+	EL_REFRESH    = 20
+};
+
+
+/* eidtline */
+EditLine *el_init(const char *prog, FILE *fin, FILE *fout, FILE *ferr);
+int el_get!(EditLine *e, int op=el_op, ...);
+int el_set!(EditLine *e, int op=el_op, ...);
+const char *el_gets!(EditLine *e, int *count);
+int el_source~(EditLine *e, const char *file);
+int el_getc~(EditLine *e, char *ch/p);
+void el_reset~(EditLine *e);
+void el_end~(EditLine *e);
+
+
+History *history_init~(void);
+int history~(History *h, HistEvent *ev, int op, ...);
+void history_end~(History *h);
+
+
+/* regex */
+enum_bm regcomp_flags {
+	REG_EXTENDED = 1,
+	REG_ICASE    = 2,
+	REG_NEWLINE  = 4,
+	REG_NOSUB    = 8
+};
+
+int regcomp(regex_t *preg, const char *regex, int cflags=regcomp_flags);
+int regexec(const regex_t *preg, const char *string, size_t nmatch, regmatch_t *pmatch, int eflags);
+void regfree!(regex_t *preg);
+
+/* libbsd */
+size_t strlcpy~(char *dst/p, const char *src, size_t siz);
+
+/* zlib */
+typedef void *z_streamp;
+int inflateInit_(z_streamp strm, const char *version, int stream_size);
+int inflateInit2_(z_streamp strm, int windowBits, const char *version, int stream_size);
+int inflateReset(z_streamp strm);
+int inflateReset2(z_streamp strm, int windowBits);
+int inflateResetKeep(z_streamp strm);

@@ -10,7 +10,7 @@ void*   rawmemchr(void *s, int c);
 void*   memrchr(void *s, int c, size_t n);
 
 
-char*   strcpy~(char *dest/p, const char *src);
+char*   strcpy~/p(char *dest/p, const char *src);
 char*   strncpy~(void *dest, char *src, size_t n);
 char*   strcat(void *dest, char *src);
 char*   strncat(void *dest, char *src, size_t n);

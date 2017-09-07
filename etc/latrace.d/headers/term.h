@@ -32,9 +32,9 @@ char*   tparm(char *s);
 char*   tparm_varargs(char *s);
 
 
-char*   tgetstr(char *s, void *a);
+char*   tgetstr~(char *s, void *a);
 char*   tgoto(char *s, int a, int b);
-int     tgetent(char *s, char *a);
-int     tgetflag(char *s);
-int     tgetnum(char *s);
+int     tgetent!(char *s, char *a);
+int     tgetflag!(char *s);
+int     tgetnum~(char *s);
 int     tputs!(char *s, int a, void *f);

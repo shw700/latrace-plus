@@ -8,7 +8,7 @@ typedef void termios;
 
 
 speed_t cfgetospeed(termios *termios_p);
-speed_t cfgetispeed(termios *termios_p);
+speed_t cfgetispeed~(termios *termios_p);
 
 
 int cfsetospeed(termios *termios_p, speed_t speed);
@@ -17,7 +17,7 @@ int cfsetspeed(termios *termios_p, speed_t speed);
 
 
 int tcgetattr(int fd, termios *termios_p);
-int tcsetattr(int fd, int optional_actions, termios *termios_p);
+int tcsetattr~(int fd, int optional_actions, termios *termios_p);
 
 
 void cfmakeraw(termios *termios_p);

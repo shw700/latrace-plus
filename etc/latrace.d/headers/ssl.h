@@ -69,6 +69,7 @@ int SSL_CTX_load_verify_locations(void *ctx, const char *CAfile, const char *CAp
 long SSL_CTX_ctrl(void *ctx, int cmd = openssl_ctrl_cmd, long larg, void *parg);
 int SSL_CTX_set_default_verify_paths(void *ctx);
 const SSL_METHOD *SSLv23_client_method~(void);
+const SSL_METHOD *SSLv23_method~(void);
 
 SSL_SESSION *SSL_SESSION_new(void);
 void SSL_SESSION_free(SSL_SESSION *session);
@@ -108,6 +109,8 @@ const char *SSL_CIPHER_get_name~(const SSL_CIPHER *c);
 const SSL_CIPHER *SSL_get_current_cipher(const SSL *s);
 
 void OPENSSL_add_all_algorithms_noconf!(void);
+void OPENSSL_load_builtin_modules!(void);
+void ENGINE_load_builtin_engines!(void);
 
 void ERR_load_SSL_strings!(void);
 void ERR_load_crypto_strings!(void);
@@ -204,6 +207,8 @@ void *SSL_get_peer_cert_chain~(const SSL *s);
 
 X509_LOOKUP_METHOD *X509_LOOKUP_hash_dir~(void);
 
+X509 *d2i_X509!(X509 **px, const unsigned char **in, int len);
+
 enum_bm conf_mflags {
 	CONF_MFLAGS_IGNORE_ERRORS       = 0x1,
 	CONF_MFLAGS_IGNORE_RETURN_CODES = 0x2,
@@ -276,4 +281,20 @@ int RAND_pseudo_bytes!(unsigned char *buf, int num);
 //void RAND_add~(const void *buf, int num, double entropy);
 int RAND_status~(void);
 
+typedef void * BIN_ULONG;
+
+BIGNUM *BN_CTX_get~(BN_CTX *ctx);
+void BN_init~(BIGNUM *);
 void BN_free~(BIGNUM *a);
+BIGNUM *bn_expand2(BIGNUM *a, int words);
+void *BN_mod_word(const BIGNUM *a, BIN_ULONG w);
+int BN_mod_exp_mont~(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m, BN_CTX *ctx, BN_MONT_CTX *m_ctx);
+int BN_is_bit_set(const BIGNUM *a, int n);
+int BN_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_MONT_CTX *mont, BN_CTX *ctx);
+
+int BN_is_prime_fasttest_ex~(const BIGNUM *p, int nchecks, BN_CTX *ctx, int do_trial_division, pfn cb);
+
+int DSA_generate_parameters_ex!(DSA *dsa, int bits, const unsigned char *seed, int seed_len, int *counter_ret, unsigned long *h_ret, BN_GENCB *cb);
+
+EC_KEY *EC_KEY_new_by_curve_name!(int nid);
+int EC_KEY_generate_key!(EC_KEY *key);

@@ -62,8 +62,8 @@ enum priority_which
   PRIO_USER = 2			/* WHO is a user ID.  */
 };
 
-extern int getrlimit(int resource = rlimit_resource, void *rlimits);
-extern int getrlimit64(int resource = rlimit_resource, void *rlimits);
+extern int getrlimit~(int resource = rlimit_resource, void *rlimits);
+extern int getrlimit64~(int resource = rlimit_resource, void *rlimits);
 extern int setrlimit(int resource = rlimit_resource, void *rlimits);
 extern int setrlimit64(int resource = rlimit_resource, void *rlimits);
 
