@@ -101,13 +101,14 @@ C++ style single line comments are supported.
 
 
 
-* Trying latrace out locally *
+* Trying latrace out locally (unpacking to ~/latrace-plus) *
 
 `autoconf && ./configure && make
 
-export LIBLDAUDIT_PATH="~/latrace-plus/libltaudit.so.0.5.12"
+export LIBLDAUDIT_PATH="~/latrace-plus/libltaudit.so.0.5.13"
+export LT_HEADERS_DIR="~/latrace-plus/etc/latrace.d/headers"
 
-./latrace -N ./etc/latrace.d/latrace.conf -d -A -x cr program args
+./latrace -N ./etc/latrace.d/latrace.conf -d -A -x cr -N ~/larace-plus//etc/latrace.d/latrace.conf program args
 `
 
 (the example above launches latrace of a program with a local config, parsing of all stock-provided header file definitions, color highlighting, and symbol address to name resolution)

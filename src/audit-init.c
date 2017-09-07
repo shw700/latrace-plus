@@ -229,7 +229,7 @@ static int setup_user_data_handlers(void)
 
 
 int glob_err(const char *epath, int eerrno) {
-	PRINT_ERROR("Encountered globbing error: %s\n", strerror(eerrno));
+//	PRINT_ERROR("Encountered globbing error: %s\n", strerror(eerrno));
 	return 0;
 }
 
@@ -271,7 +271,10 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 	ret = glob(globdir, GLOB_ERR, glob_err, &rglob);
 
-	if (ret != 0 && ret != GLOB_NOMATCH) {
+	if (ret == GLOB_ABORTED && errno == ENOENT) {
+		PRINT_ERROR("%s", "No transformers directory found; skipping.\n");
+		return 0;
+	} else if (ret != 0 && ret != GLOB_NOMATCH) {
 		PRINT_ERROR("Unable to read transformers libraries directory: %s\n", strerror(errno));
 		return -1;
 	}

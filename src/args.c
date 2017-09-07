@@ -472,6 +472,10 @@ left:
 		
 	}
 
+	/* Make sure we report a plain old zero */
+	if (!val && !lbuf[0])
+		lbuf[0] = '0';
+
 	return (strdup(lbuf));
 } 
 

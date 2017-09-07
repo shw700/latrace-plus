@@ -18,19 +18,27 @@
 
 
 AC_PREREQ(2.61)
-AC_INIT(latrace, 0.5.12, olsajiri@gmail.com)
+AC_INIT(latrace, 0.5.13, olsajiri@gmail.com)
 AC_CONFIG_SRCDIR([src/latrace.c])
 
 AC_PROG_CC
+
 AC_PROG_LEX
 AS_IF([test "x$LEX" = "x:"],
       [AC_MSG_ERROR([lex/flex is needed.])])
+
 AC_PROG_YACC
-AS_IF([test "x$YACC" = "x:"],
-      [AC_MSG_ERROR([yacc/bison is needed.])])
+if test x"$YACC" = "xyacc"; then
+	AC_CHECK_PROG([YACC_EXISTS], [yacc], [yes], [no])
+	if test x"$YACC_EXISTS" != xyes; then
+		AC_MSG_ERROR([[bison/byacc/yacc not found. Please install bison]])
+	fi
+fi
+
 AC_PROG_LN_S
 AC_PATH_PROG([ASCIIDOC], [asciidoc], [:])
 AC_PATH_PROG([XMLTO], [xmlto], [:])
+
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([stdlib.h])
@@ -106,6 +114,9 @@ fi
 AC_SEARCH_LIBS([cplus_demangle], [iberty_pic iberty],
 	[AC_DEFINE(CONFIG_LIBERTY, 1, "Liberty found.")],
 	[AC_MSG_WARN([libiberty not found, no demangle support (install binutils-dev)])])
+
+AC_SEARCH_LIBS([elf_getscn], [elf], [],
+	[AC_MSG_ERROR([libelf not found; must be installed (try libelf-dev)])])
 
 AC_CONFIG_HEADER([src/autoconf.h])
 AC_CONFIG_FILES([src/autoconf.make])

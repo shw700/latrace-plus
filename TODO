@@ -34,5 +34,7 @@ Other:
 	- * New library loads should trigger symbol load
 	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten
 	- * get rid of old bm_enum declaration type
-	- Should probably reap old thread_buffers
+	- Should probably reap old thread_buffers to prevent memory leakage
 	- * Provide updated include files
+	- * add non-collapsible functions (_setjmp)
+	- * tersely collapsed functions should not display nested functions of bare/fully collapsed functions

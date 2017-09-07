@@ -93,7 +93,7 @@ static void usage()
 	printf("    -h, --help                      display help\n");
 	printf("\n");
 
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 static void version() NORETURN;
@@ -456,6 +456,44 @@ int lt_config_ln_fill(struct lt_list_head *head, char *buf, int size)
 
 const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 {
+	int c, optret;
+	int option_index = 0;
+	static struct option long_options[] = {
+		{"sym", required_argument, 0, 's'},
+		{"sym-omit", required_argument, 0, 'n'},
+		{"libs", required_argument, 0, 'l'},
+		{"libs-to", required_argument, 0, 't'},
+		{"libs-from", required_argument, 0, 'f'},
+		{"no-indent-sym", no_argument, 0, 'I'},
+		{"indent-sym", required_argument, 0, 'i'},
+		{"braces", no_argument, 0, 'B'},
+		{"demangle", no_argument, 0, 'd'},
+		{"format", required_argument, 0, 'x'},
+		{"timestamp", required_argument, 0, 'S'},
+		{"flow-below", required_argument, 0, 'b'},
+		{"counts", no_argument, 0, 'c'},
+		{"sort-counts", required_argument, 0, 'C'},
+		{"pipe", no_argument, 0, 'p'},
+		{"output", required_argument, 0, 'o'},
+		{"conf", required_argument, 0, 'N'},
+		{"args", required_argument, 0, 'a'},
+		{"enable-args", required_argument, 0, 'A'},
+		{"detail-args", required_argument, 0, 'D'},
+		{"framesize", required_argument, 0, 'y'},
+		{"no-framesize-check ", no_argument, 0, 'Y'},
+		{"lib-subst", required_argument, 0, 'L'},
+		{"verbose", no_argument, 0, 'v'},
+		{"hide-tid", no_argument, 0, 'T'},
+		{"no-follow-fork", no_argument, 0, 'F'},
+		{"no-follow-exec", no_argument, 0, 'E'},
+		{"disable", no_argument, 0, 'q'},
+		{"ctl-config", no_argument, 0, 'R'},
+		{"version", no_argument, 0, 'V'},
+		{"help", no_argument, 0, 'h'},
+		{0, 0, 0, 0}
+		};
+	int did_custom_conf = 0;
+
 	memset(cfg, 0, sizeof(*cfg));
 	cfg->sh = cfg->sh_storage.sh = &cfg->sh_storage;
 
@@ -473,49 +511,32 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 	cfg->csort = LT_CSORT_CALL;
 	cfg->output_tty_fd = -1;
 
-	/* read the default config file first */
-	if (read_config(cfg, LT_CONF_DIR "/latrace.conf")) {
-		printf("failed: read config file '" LT_CONF_DIR "/latrace.conf'\n");
-		usage();
+	/* see if we specify a custom conf; do a dry run */
+	while ((c = getopt_long(argc, argv, "+s:n:l:t:f:vhi:Bdx:ISb:cC:y:YL:po:a:N:ADVTFERqg",
+					long_options, &option_index)) != -1) {
+
+		if (c == 'N') {
+
+			/* read user-specifide config file */
+			if (read_config(cfg, optarg)) {
+				fprintf(stderr, "Error: could not read config file '%s'\n", optarg);
+				exit(EXIT_FAILURE);
+			}
+
+			did_custom_conf = 1;
+		}
 	}
 
+	/* read the default config file first */
+	if (!did_custom_conf && read_config(cfg, LT_CONF_DIR "/latrace.conf")) {
+		fprintf(stderr, "Error: could not read config file '" LT_CONF_DIR "/latrace.conf'\n");
+		exit(EXIT_FAILURE);
+	}
+
+	option_index = 0;
+	optind = 1;
+
 	while (1) {
-		int c, optret;
-		int option_index = 0;
-		static struct option long_options[] = {
-			{"sym", required_argument, 0, 's'},
-			{"sym-omit", required_argument, 0, 'n'},
-			{"libs", required_argument, 0, 'l'},
-			{"libs-to", required_argument, 0, 't'},
-			{"libs-from", required_argument, 0, 'f'},
-			{"no-indent-sym", no_argument, 0, 'I'},
-			{"indent-sym", required_argument, 0, 'i'},
-			{"braces", no_argument, 0, 'B'},
-			{"demangle", no_argument, 0, 'd'},
-			{"format", required_argument, 0, 'x'},
-			{"timestamp", required_argument, 0, 'S'},
-			{"flow-below", required_argument, 0, 'b'},
-			{"counts", no_argument, 0, 'c'},
-			{"sort-counts", required_argument, 0, 'C'},
-			{"pipe", no_argument, 0, 'p'},
-			{"output", required_argument, 0, 'o'},
-			{"conf", required_argument, 0, 'N'},
-			{"args", required_argument, 0, 'a'},
-			{"enable-args", required_argument, 0, 'A'},
-			{"detail-args", required_argument, 0, 'D'},
-			{"framesize", required_argument, 0, 'y'},
-			{"no-framesize-check ", no_argument, 0, 'Y'},
-			{"lib-subst", required_argument, 0, 'L'},
-			{"verbose", no_argument, 0, 'v'},
-			{"hide-tid", no_argument, 0, 'T'},
-			{"no-follow-fork", no_argument, 0, 'F'},
-			{"no-follow-exec", no_argument, 0, 'E'},
-			{"disable", no_argument, 0, 'q'},
-			{"ctl-config", no_argument, 0, 'R'},
-			{"version", no_argument, 0, 'V'},
-			{"help", no_argument, 0, 'h'},
-			{0, 0, 0, 0}
-		};
 
 		c = getopt_long(argc, argv, "+s:n:l:t:f:vhi:Bdx:ISb:cC:y:YL:po:a:N:ADVTFERqg",
 					long_options, &option_index);
@@ -660,11 +681,11 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 		#endif /* CONFIG_ARCH_HAVE_ARGS */
 
 		case 'N':
-			/* read user-specifide config file */
-			if (read_config(cfg, optarg)) {
-				printf("failed: read config file '%s'\n", optarg);
-				usage();
-			}
+			/* No need to do this because it was handled earlier */
+/*			if (read_config(cfg, optarg)) {
+				fprintf(stderr, "Error: could not read config file '%s'\n", optarg);
+				exit(EXIT_FAILURE);
+			}*/
 			break;
 
 		case 'o':
@@ -692,7 +713,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 			break;
 
 		default:
-			printf("unknown option '%c'\n", c);
+			fprintf(stderr, "Error: unknown option '%c'\n", c);
 			usage();
 			break;
 		} // switch (c)
@@ -714,13 +735,13 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 	}
 
 	if (!cfg->prog) {
-		printf("failed: no program specified\n");
+		fprintf(stderr, "failed: no program specified\n");
 		usage();
 	}
 
 	if ((lt_sh(cfg, pipe)) && (*lt_sh(cfg, output)) &&
 	    (NULL == (lt_sh(cfg, fout) = fopen(lt_sh(cfg, output), "w")))) {
-		printf("failed to fopen output file %s\n", lt_sh(cfg, output));
+		fprintf(stderr, "failed to fopen output file %s\n", lt_sh(cfg, output));
 		usage();
 	}
 

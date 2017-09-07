@@ -348,7 +348,7 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 		}
 
 		if (ELF64_ST_TYPE(symtab->st_info) != STT_FUNC) {
-			fprintf(stderr, "HEH: %s / %d\n", rstrtab+symtab->st_name, ELF64_ST_TYPE(symtab->st_info));
+//			fprintf(stderr, "XXX: %s / %d\n", rstrtab+symtab->st_name, ELF64_ST_TYPE(symtab->st_info));
 		}
 
 		rptr->addr = (unsigned long)lm->l_addr + symtab->st_value;

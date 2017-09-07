@@ -714,7 +714,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		return -1;
 
 	if (asym->argcnt == 1) {
-		snprintf(data->args_buf+data->args_totlen, data->arglen-data->args_totlen, "void");
+		snprintf(data->args_buf+data->args_totlen, data->args_len-data->args_totlen, "void");
 		data->args_totlen += strlen(data->args_buf+data->args_totlen);
 		return 0;
 	}
@@ -728,14 +728,20 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 		if (pval && arg->latrace_custom_struct_transformer && (!arg->fmt || !*(arg->fmt))) {
 			void *pvald = *((void**) pval);
-			char *saved_args_buf;
-			size_t left, saved_arglen, saved_totlen;
+			size_t left, saved_totlen;
 			int result;
+			static size_t seplen_color = 0;
 
-			saved_args_buf = data->args_buf;
-			saved_arglen = data->arglen;
+			if (!seplen_color)
+				seplen_color = strlen(BOLD) + strlen(BOLDOFF) + 2;
+
 			saved_totlen = data->args_totlen;
-			left = data->arglen - data->args_totlen;
+//			left = data->arglen - data->args_totlen;
+			if ((i * data->arglen) < data->args_len)
+				left = (i * data->arglen) - data->args_totlen;
+			else
+				left = data->args_len - data->args_totlen;
+
 			memset(data->args_buf+data->args_totlen, 0, left);
 			left--;
 			result = snprintf(data->args_buf+data->args_totlen, left, "%s = ", arg->name);
@@ -743,7 +749,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			left -= result;
 
 			if (i+1 < asym->argcnt)
-				left -= 2;
+				left -= (cfg->fmt_colors ? seplen_color : 2);
 
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
@@ -776,10 +782,8 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 					continue;
 				} else {
-					data->args_buf = saved_args_buf;
-					data->arglen = saved_arglen;
 					data->args_totlen = saved_totlen;
-					memset(data->args_buf+data->args_totlen, 0, data->arglen-data->args_totlen);
+					memset(data->args_buf+data->args_totlen, 0, left);
 				}
 
 			}
