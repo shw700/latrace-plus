@@ -180,7 +180,7 @@ int lt_fifo_recv(struct lt_config_app *cfg, struct lt_thread *t, void *buf,
 
 int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 			struct timeval *tv, char *symname, char *libto,
-			char *arg, char *argd, int collapsed)
+			char *libfrom, char *arg, char *argd, int collapsed)
 {
 	struct lt_fifo_msym *m = (struct lt_fifo_msym*) buf;
 	int len_data, len = sizeof(struct lt_fifo_msym);
@@ -192,13 +192,15 @@ int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 
 	m->sym = 0;
 	m->collapsed = collapsed;
-	m->lib = strlen(symname);
-	m->arg = m->lib + strlen(libto) + 1;
+	m->lib_to = strlen(symname);
+	m->lib_from = m->lib_to + strlen(libto) + 1;
+	m->arg = m->lib_from + strlen(libfrom) + 1;
 	m->argd = m->arg + strlen(arg) + 1;
 
-	len_data = sprintf(m->data, "%s %s %s %s", symname, libto, arg, argd);
+	len_data = sprintf(m->data, "%s %s %s %s %s", symname, libto, libfrom, arg, argd);
 
-	m->data[m->lib++]   = 0x0;
+	m->data[m->lib_to++]   = 0x0;
+	m->data[m->lib_from++]   = 0x0;
 	m->data[m->arg++]   = 0x0;
 	m->data[m->argd++]  = 0x0;
 	m->data[len_data++] = 0x0;
@@ -206,10 +208,11 @@ int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 	len += len_data;
 	m->h.len = len_data + (sizeof(*m) - sizeof(struct lt_fifo_mbase));
 
-	PRINT_VERBOSE(cfg, 1, "sending data %d <%s> <%s> <%s> <%s>\n",
+	PRINT_VERBOSE(cfg, 1, "sending data %d <%s> <%s> <%s> <%s> <%s>\n",
 						m->h.len, 
 						m->data + m->sym, 
-						m->data + m->lib,
+						m->data + m->lib_to,
+						m->data + m->lib_from,
 						m->data + m->arg,
 						m->data + m->argd);
 	return len;

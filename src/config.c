@@ -263,6 +263,8 @@ static int process_option_val(struct lt_config_app *cfg, int idx,
 					lt_sh(cfg, lib_short) = 1;
 				else if (*fopt == 'c')
 					lt_sh(cfg, fmt_colors) = 1;
+				else if (*fopt == 'l')
+					lt_sh(cfg, src_lib_pfx) = 1;
 				else if (*fopt == 'r')
 					lt_sh(cfg, resolve_syms) = 1;
 				else {
@@ -510,6 +512,7 @@ const char *lt_config(struct lt_config_app *cfg, int argc, char **argv)
 	lt_sh(cfg, indent_sym)      = 1;
 	lt_sh(cfg, indent_size)     = 2;
 	lt_sh(cfg, lib_short)       = 0;
+	lt_sh(cfg, src_lib_pfx)	    = 0;
 	lt_sh(cfg, fmt_colors)      = 0;
 	lt_sh(cfg, args_maxlen)     = LR_ARGS_MAXLEN;
 	lt_sh(cfg, args_detail_maxlen) = LR_ARGS_DETAIL_MAXLEN;

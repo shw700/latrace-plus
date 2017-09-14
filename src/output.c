@@ -250,8 +250,8 @@ int lt_out_entry(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
 			int indent_depth, int collapsed,
 			const char *symname, char *lib_to,
-			char *argbuf, char *argdbuf,
-			size_t *nsuppressed)
+			char *lib_from, char *argbuf,
+			char *argdbuf, size_t *nsuppressed)
 {
 	const char *cur_color = NULL;
 	const char *end_line = "{\n";
@@ -348,6 +348,30 @@ int lt_out_entry(struct lt_config_shared *cfg,
 			lib_to = ++rptr;
 	}
 
+	if (lt_sh(cfg, src_lib_pfx)) {
+		char *fmt_on = "", *fmt_off = "";
+
+		if (cfg->fmt_colors) {
+			fmt_on = BOLD;
+			fmt_off = BOLDOFF;
+		}
+
+		if (!lib_from || !*lib_from)
+			lib_from = "[]";
+		else {
+			char *chrptr = strrchr(lib_from, '/');
+
+			if (chrptr)
+				lib_from = ++chrptr;
+
+			if ((chrptr = strchr(lib_from, '.')))
+				*chrptr = 0;
+
+		}
+
+		PRINT_DATA(buffered, "%s%s:%s", fmt_on, lib_from, fmt_off);
+	}
+
 	if (collapsed == COLLAPSED_BARE)
 		end_line = "";
 	else if (collapsed == COLLAPSED_TERSE)
@@ -392,8 +416,8 @@ int lt_out_exit(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
 			int indent_depth, int collapsed,
 			const char *symname, char *lib_to,
-			char *argbuf, char *argdbuf,
-			size_t *nsuppressed)
+			char *lib_from, char *argbuf,
+			char *argdbuf, size_t *nsuppressed)
 {
 	const char *cur_color = NULL;
 	char *prefix;

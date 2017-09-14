@@ -141,7 +141,8 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 		lt_out_entry(cfg->sh, &msym->h.tv, msym->h.tid,
 				t->indent_depth, msym->collapsed,
 				symname,
-				msym->data + msym->lib,
+				msym->data + msym->lib_to,
+				msym->data + msym->lib_from,
 				msym->data + msym->arg,
 				msym->data + msym->argd,
 				&t->nsuppressed);
@@ -152,7 +153,8 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 			lt_out_exit(cfg->sh, &msym->h.tv, msym->h.tid,
 					t->indent_depth, msym->collapsed,
 					msym->data + msym->sym,
-					msym->data + msym->lib,
+					msym->data + msym->lib_to,
+					msym->data + msym->lib_from,
 					msym->data + msym->arg,
 					msym->data + msym->argd,
 					&t->nsuppressed);

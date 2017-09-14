@@ -106,7 +106,7 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 	jmp_buf env;
 	int realloc = 0;
 
-	snprintf(buf, sizeof(buf), "%s%s", m->data + m->sym, m->data + m->lib);
+	snprintf(buf, sizeof(buf), "%s%s", m->data + m->sym, m->data + m->lib_to + m->lib_from);
 
 	XSTRDUP_ASSIGN(e.key, buf);
 	if (!e.key)
@@ -142,7 +142,7 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 
 		sym->name = e.key;
 		XSTRDUP_ASSIGN(sym->sym, (m->data + m->sym));
-		XSTRDUP_ASSIGN(sym->lib, (m->data + m->lib));
+		XSTRDUP_ASSIGN(sym->lib, (m->data + m->lib_to));
 
 		if (!sym->sym || !sym->lib)
 			return -1;

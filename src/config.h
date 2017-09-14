@@ -224,6 +224,7 @@ struct lt_config_shared {
 	int braces;
 	int demangle;
 	int lib_short;
+	int src_lib_pfx;
 	int fmt_colors;
 	int resolve_syms;
 	int counts;
@@ -354,7 +355,8 @@ struct lt_fifo_msym {
 	struct lt_fifo_mbase h;
 
 	int sym;
-	int lib;
+	int lib_to;
+	int lib_from;
 	int arg;
 	int argd;
 	int collapsed;
@@ -423,7 +425,7 @@ int lt_fifo_recv(struct lt_config_app *cfg, struct lt_thread *t,
 		void *buf, int bufsize);
 int lt_fifo_msym_get(struct lt_config_audit *cfg, char *buf, int type,
 			struct timeval *tv, char *symname, char *libto,
-			char *arg, char *argd, int collapsed);
+			char *libfrom, char *arg, char *argd, int collapsed);
 
 /* counts */
 int lt_stats_init(struct lt_config_app *cfg);
@@ -440,11 +442,11 @@ struct lt_thread *lt_thread_next(struct lt_config_app *cfg);
 /* output */
 int lt_out_entry(struct lt_config_shared *cfg, struct timeval *tv,
 		pid_t tid, int indent_depth, int collapsed,
-		const char *symname, char *lib_to,
+		const char *symname, char *lib_to, char *lib_from,
 		char *argbuf, char *argdbuf, size_t *nsuppressed);
 int lt_out_exit(struct lt_config_shared *cfg, struct timeval *tv,
 		pid_t tid, int indent_depth, int collapsed,
-		const char *symname, char *lib_to,
+		const char *symname, char *lib_to, char *lib_from,
 		char *argbuf, char *argdbuf, size_t *nsuppressed);
 
 /* la_objsearch */

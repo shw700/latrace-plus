@@ -226,14 +226,14 @@ STATIC int sym_entry(const char *symname, void *ptr,
 
 		if (tsd->excised) {
 			len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
-					"", lib_to, tsd->excised, argdbuf, collapsed);
+					"", lib_to, lib_from, tsd->excised, argdbuf, collapsed);
 			lt_fifo_send(&cfg, tsd->pipe_fd, buf, len);
 			safe_free(tsd->excised);
 			tsd->excised = NULL;
 		}
 
 		len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
-				(char*) symname, lib_to, argbuf, argdbuf, collapsed);
+				(char*) symname, lib_to, lib_from, argbuf, argdbuf, collapsed);
 
 		free_argbuf(argret, argbuf, argdbuf);
 
@@ -250,7 +250,7 @@ STATIC int sym_entry(const char *symname, void *ptr,
 
 	if (tsd->excised) {
 		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), tsd->indent_depth, collapsed,
-			"", lib_to, tsd->excised, argdbuf, &tsd->nsuppressed);
+			"", lib_to, lib_from, tsd->excised, argdbuf, &tsd->nsuppressed);
 		safe_free(tsd->excised);
 		tsd->excised = NULL;
 	}
@@ -258,7 +258,7 @@ STATIC int sym_entry(const char *symname, void *ptr,
 	/* If symname is empty then all we care about is preserving the call stack depth */
 	if (*symname) {
 		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), tsd->indent_depth, collapsed,
-			symname, lib_to, argbuf, argdbuf, &tsd->nsuppressed);
+			symname, lib_to, lib_from, argbuf, argdbuf, &tsd->nsuppressed);
 	}
 
 	free_argbuf(argret, argbuf, argdbuf);
@@ -341,7 +341,7 @@ STATIC int sym_exit(const char *symname, void *ptr, char *lib_from, char *lib_to
 			collapsed = sym->collapsed;
 
 		len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_EXIT, &tv,
-				(char*) symname, lib_to, argbuf, argdbuf, collapsed);
+				(char*) symname, lib_to, lib_from, argbuf, argdbuf, collapsed);
 
 		free_argbuf(argret, argbuf, argdbuf);
 
@@ -350,7 +350,7 @@ STATIC int sym_exit(const char *symname, void *ptr, char *lib_from, char *lib_to
 
 	lt_out_exit(cfg.sh, &tv, syscall(SYS_gettid),
 			tsd->indent_depth, collapsed,
-			symname, lib_from,
+			symname, lib_to, lib_from,
 			argbuf, argdbuf, &tsd->nsuppressed);
 
 	if (tsd->indent_depth)
