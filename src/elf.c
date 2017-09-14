@@ -101,10 +101,17 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 
 	if (!addr_mapping_size) {
 		addr_mapping_size = 128;
-		XMALLOC_ASSIGN(addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
+//		XMALLOC_ASSIGN(addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
+		addr_mappings = safe_malloc(sizeof(*addr_mappings) * addr_mapping_size);
 	} else if (addr_mapping_used == addr_mapping_size) {
 		addr_mapping_size *= 2;
-		XREALLOC_ASSIGN(addr_mappings, addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
+//		XREALLOC_ASSIGN(addr_mappings, addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
+		addr_mappings = safe_realloc(addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
+	}
+
+	if (!addr_mappings) {
+		PRINT_ERROR("Error allocating memory for address mapping: %s\n", strerror(errno));
+		return;
 	}
 
 	ind = bsearch_address_mapping_unlocked(symaddr, size, &insert);
@@ -116,16 +123,21 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 
 		addr_mappings[ind].addr = symaddr;
 		addr_mappings[ind].size = size;
-		XSTRDUP_ASSIGN(addr_mappings[ind].name, name);
+//		XSTRDUP_ASSIGN(addr_mappings[ind].name, name);
+		addr_mappings[ind].name = safe_strdup(name);
 		addr_mapping_used++;
 	} else {
 		// For now, only permit a perfect overwrite
 		if ((addr_mappings[ind].addr == symaddr) && (addr_mappings[ind].size == size)) {
-			XFREE(addr_mappings[ind].name);
-			XSTRDUP_ASSIGN(addr_mappings[ind].name, name);
+//			XFREE(addr_mappings[ind].name);
+//			XSTRDUP_ASSIGN(addr_mappings[ind].name, name);
+			safe_free(addr_mappings[ind].name);
+			addr_mappings[ind].name = safe_strdup(name);
 		}
 
 	}
+
+	// XXX: the strdup/assignments above need error checking.
 
 	pthread_rwlock_unlock(&mapping_lock);
 	return;
@@ -153,7 +165,8 @@ remove_address_mapping(void *symaddr, size_t size, const char *hint) {
 		// Freeing the whole thing or part of it?
 		// Free the whole thing if our size requests match, or if size==0 was specified
 		if ((addr_mappings[ind].addr == caddr) && ((size == addr_mappings[ind].size) || !size)) {
-			XFREE(addr_mappings[ind].name);
+//			XFREE(addr_mappings[ind].name);
+			safe_free(addr_mappings[ind].name);
 			memmove(&addr_mappings[ind], &addr_mappings[ind+1], sizeof(addr_mappings[0]) * (addr_mapping_used-(ind+1)));
 			addr_mapping_used--;
 		} else {
@@ -176,7 +189,7 @@ remove_address_mapping(void *symaddr, size_t size, const char *hint) {
 }
 
 const char *
-get_address_mapping(void *symaddr, size_t *offset) {
+get_address_mapping(void *symaddr, size_t *size, size_t *offset) {
 	unsigned char *caddr = (unsigned char *)symaddr;
 	const char *name = NULL;
 	size_t ind;
@@ -188,7 +201,12 @@ get_address_mapping(void *symaddr, size_t *offset) {
 
 	if (!insert) {
 		name = addr_mappings[ind].name;
-		*offset = (size_t)(caddr - addr_mappings[ind].addr);
+
+		if (size)
+			*size = addr_mappings[ind].size;
+
+		if (offset)
+			*offset = (size_t)(caddr - addr_mappings[ind].addr);
 	}
 
 	pthread_rwlock_unlock(&mapping_lock);
@@ -320,7 +338,8 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 
 	rsize = strtab_size + (nsyms * sizeof(symbol_mapping_t));
 
-	XMALLOC_ASSIGN(result, rsize);
+//	XMALLOC_ASSIGN(result, rsize);
+	result = safe_malloc(rsize);
 	if (!result) {
 		perror("xmalloc");
 		return 0;

@@ -577,20 +577,23 @@ enter_transformer_callstack(char *symname, La_regs *inregs, void **args, size_t 
 #ifdef USE_GLIBC_FEATURES
 		XMALLOC_ASSIGN(tsd->xfm_call_stack, (sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max));
 #else
-		tsd->xfm_call_stack = mmap(NULL, (sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max),
-			PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+		tsd->xfm_call_stack = safe_malloc(sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max);
 #endif
 	} else if (tsd->xfm_call_stack_sz == tsd->xfm_call_stack_max) {
-		size_t old_size, new_size;
+		size_t new_size;
 
-		old_size = sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max;
 		tsd->xfm_call_stack_max *= 2;
 		new_size = sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max;
 #ifdef USE_GLIBC_FEATURES
 		XREALLOC_ASSIGN(tsd->xfm_call_stack, tsd->xfm_call_stack, new_size);
 #else
-		tsd->xfm_call_stack = mremap(tsd->xfm_call_stack, old_size, new_size, MREMAP_MAYMOVE);
+		tsd->xfm_call_stack = safe_realloc(tsd->xfm_call_stack, new_size);
 #endif
+	}
+
+	if (!tsd->xfm_call_stack) {
+		PRINT_ERROR("Error allocating space for call stack: %s\n", strerror(errno));
+		return;
 	}
 
 	tsd->xfm_call_stack[tsd->xfm_call_stack_sz].fn_name = symname;
@@ -658,8 +661,11 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 #ifdef USE_GLIBC_FEATURES
 		XMALLOC_ASSIGN(targs, (sizeof(void *) * asym->argcnt));
 #else
-		targs = safe_malloc(4096);
+		targs = safe_malloc((sizeof(void *) * asym->argcnt));
 #endif
+
+		if (!targs)
+			return -1;
 
 		for(i = 1; i < asym->argcnt; i++) {
 			void *pval = NULL;
@@ -886,7 +892,11 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		}
 
 		if (inargs)
+#ifdef USE_GLIBC_FEATURES
 			XFREE(inargs);
+#else
+			safe_free(inargs);
+#endif
 
 		if (silent)
 			return 0;

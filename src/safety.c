@@ -2,6 +2,8 @@
 
 #include "config.h"
 
+#include <libiberty/demangle.h>
+
 #ifdef USE_LIBUNWIND
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
@@ -32,18 +34,64 @@ xstrdup(const char *s) {
 inline void *
 safe_malloc(size_t size) {
 	void *result;
+	size_t *szptr;
+
+	size += sizeof(size_t);
 
 	if (size < 4096)
 		size = 4096;
 
-	result = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
-	return (result == MAP_FAILED) ? NULL : result;
+	if ((result = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED)
+		return NULL;
+
+	szptr = (size_t *)result;
+	*szptr++ = size - sizeof(size_t);
+	return (void *)szptr;
 }
 
 inline void
 safe_free(void *ptr) {
-	munmap(ptr, 4096);
+	size_t *szptr = ptr;
+
+	if (!ptr)
+		return;
+
+	szptr--;
+	munmap(szptr, *szptr+sizeof(size_t));
+	return;
 }
+
+inline void *
+safe_realloc(void *ptr, size_t size) {
+	void *result;
+	size_t *szptr = ptr;
+
+	result = safe_malloc(size);
+
+	if (!ptr)
+		return result;
+
+	szptr--;
+	memcpy(result, ptr, *szptr);
+	safe_free(ptr);
+	return result;
+}
+
+inline char *
+safe_strdup(const char *s) {
+	char *result;
+	size_t len;
+
+	len = strlen(s) + 1;
+
+	if (!(result = safe_malloc(len)))
+		return NULL;
+
+	memcpy(result, s, len);
+	result[len] = 0;
+	return result;
+}
+
 
 
 #ifdef USE_LIBUNWIND
@@ -120,4 +168,39 @@ _print_backtrace(void) {
 	backtrace_symbols_fd(btbuf, nbt, 2);
 #endif
 	return;
+}
+
+
+typedef struct demangle_buffer {
+	char *buffer;
+	size_t bufsize;
+} demangle_buffer_t;
+
+static void
+_safe_demangle_cb(const char *buf, size_t bsize, void *opaque)
+{
+	demangle_buffer_t *dmbuf = opaque;
+	size_t left, dlen, maxb;
+
+	if (!dmbuf)
+		return;
+
+	dlen = strlen(dmbuf->buffer);
+	left = dmbuf->bufsize - (dlen + 1);
+	maxb = (left < bsize) ? left : bsize;
+	strncpy(&dmbuf->buffer[dlen], buf, maxb);
+
+	return;
+}
+
+int
+_safe_demangle(const char *symname, char *buf, size_t bufsize) {
+	demangle_buffer_t dmbuf;
+	int ret;
+
+	memset(&dmbuf, 0, sizeof(dmbuf));
+	dmbuf.buffer = buf;
+	dmbuf.bufsize = bufsize;
+	ret = cplus_demangle_v3_callback(symname, 0, _safe_demangle_cb, &dmbuf);
+	return ret;
 }

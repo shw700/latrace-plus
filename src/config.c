@@ -421,6 +421,9 @@ int lt_config_ln_add(struct lt_list_head *head, char *name)
                 return -1;
 
 	XSTRDUP_ASSIGN(ln->name, name);
+	if (!ln->name)
+		return -1;
+
         lt_init_list_head(&ln->list);
         lt_list_add_tail(&ln->list, head);
 	return 0;

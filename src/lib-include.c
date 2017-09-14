@@ -123,7 +123,11 @@ int lt_inc_open(struct lt_config_shared *cfg, struct lt_include *inc,
 	memset(inc_stack, 0, sizeof(*inc_stack));
 
 	inc_stack->in     = f;
+
 	XSTRDUP_ASSIGN(inc_stack->file, file);
+	if (!inc_stack->file)
+		return -1;
+
 	inc_stack->lineno = 1;
 	inc_stack->buf    = inc->create_buffer(f, YY_BUF_SIZE);
 

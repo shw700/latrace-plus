@@ -57,6 +57,7 @@ void **__libc_dl_error_tsd~(void);
 void _dl_get_tls_static_info~(size_t *sizep, size_t *alignp);
 int __clone(pfn fn, void *__child_stack, int __flags, void *__arg, ...);
 int __clone2(pfn fn, void *__child_stack_base, size_t __child_stack_size, int __flags, void *__arg, ...);
+void *__tls_get_addr~(tls_index *ti);
 
 typedef unsigned long ptrdiff_t;
 void* __dynamic_cast~(const void* __src_ptr, const __class_type_info* __src_type, const __class_type_info* __dst_type, ptrdiff_t __src2dst);

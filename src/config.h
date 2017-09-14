@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 #include "audit.h"
 #include "list.h"
@@ -520,7 +521,8 @@ do { \
 #define PRINT_ERROR	PRINT_ERROR_SAFE
 #define PRINT_ERROR_SAFE(fmt, ...)	do { char buf[1024]; memset(buf, 0, sizeof(buf));	\
 					snprintf(buf, sizeof(buf), BOLDRED fmt RESET, __VA_ARGS__);	\
-					write(2, buf, strlen(buf)); } while (0)
+					write(STDERR_FILENO, buf, strlen(buf)); \
+					fsync(STDERR_FILENO); } while (0)
 
 
 //#define USE_GLIBC_FEATURES	1
@@ -538,29 +540,34 @@ extern char *xstrdup(const char *s);
 extern void _print_backtrace(void);
 
 extern void *safe_malloc(size_t size);
+extern void *safe_realloc(void *ptr, size_t size);
 extern void safe_free(void *ptr);
-//#define safe_malloc(size)	mmap(NULL, (size < 4096 ? 4096 : size), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)
-//#define safe_free(ptr)	munmap(ptr, 4096)
+extern char *safe_strdup(const char *s);
+
+#define SANITY_CHECK(ret)		if (!ret) { PRINT_ERROR("%s", "Fatal internal memory error; allocation returned NULL.\n"); }
 
 #ifdef USE_GLIBC_FEATURES
-	#define XMALLOC_ASSIGN(val,parm)	do { val = xmalloc(parm); } while (0)
-	#define XREALLOC_ASSIGN(val,p1,p2)	do { val = xrealloc(p1,p2); } while (0)
-	#define XSTRDUP_ASSIGN(val,parm)	do { val = xstrdup(parm); } while (0)
+	#define XMALLOC_ASSIGN(val,parm)	do { val = xmalloc(parm); SANITY_CHECK(val); } while (0)
+	#define XREALLOC_ASSIGN(val,p1,p2)	do { val = xrealloc(p1,p2); SANITY_CHECK(val); } while (0)
+	#define XSTRDUP_ASSIGN(val,parm)	do { val = xstrdup(parm); SANITY_CHECK(val); } while (0)
 	#define XFREE(parm)			free(parm)
 #else
 	#define SAFETY_WARNING(func)		if (glibc_unsafe) {	\
-							/* PRINT_ERROR("Warning: potentially unsafe call to %s() from line %d, file %s\n", func, __LINE__, __FILE__); */	\
-							/* _print_backtrace(); */ \
+							PRINT_ERROR("Warning: potentially unsafe call to %s() from line %d, file %s\n", func, __LINE__, __FILE__); 	\
+							_print_backtrace(); \
 						}
 	#define XMALLOC_ASSIGN(val,parm)	do {	\
 							SAFETY_WARNING("malloc");	\
-							val = xmalloc(parm); } while (0)
+							val = xmalloc(parm); \
+							SANITY_CHECK(val); } while (0)
 	#define XREALLOC_ASSIGN(val,p1,p2)	do {	\
 							SAFETY_WARNING("realloc");	\
-							val = xrealloc(p1,p2); } while (0)
+							val = xrealloc(p1,p2); \
+							SANITY_CHECK(val); } while (0)
 	#define XSTRDUP_ASSIGN(val,parm)	do {	\
 							SAFETY_WARNING("strdup");	\
-							val = xstrdup(parm); } while (0)
+							val = xstrdup(parm); \
+							SANITY_CHECK(val); } while (0)
 	#define XFREE(parm)			do {	\
 							SAFETY_WARNING("free");	\
 							free(parm); } while (0)
@@ -583,6 +590,9 @@ do { \
 #else
 #define DEMANGLE(sym, d)
 #endif
+
+extern int _safe_demangle(const char *symname, char *buf, size_t bufsize);
+
 
 #define ANON_PREFIX	"_anon_"
 

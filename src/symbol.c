@@ -91,7 +91,7 @@ static int symbol_init(struct lt_config_shared *cfg,
 struct lt_symbol* lt_symbol_bind(struct lt_config_shared *cfg,
 				void *ptr, const char *name)
 {
-	static struct lt_symbol *sym = NULL;
+	struct lt_symbol *sym = NULL;
 	struct lt_symbol *s = NULL;
 	struct lt_args_sym *a;
 	void *val;
@@ -106,13 +106,11 @@ struct lt_symbol* lt_symbol_bind(struct lt_config_shared *cfg,
 		return s;
 	}
 
-	if (!sym) {
-		XMALLOC_ASSIGN(sym, sizeof(*sym));
-		if (!sym)
-			return NULL;
-	}
+	sym = safe_malloc(sizeof(*sym));
+	if (!sym)
+		return NULL;
 
-	bzero(sym, sizeof(*sym));
+	memset(sym, 0, sizeof(*sym));
 	sym->ptr  = ptr;
 	sym->name = name;
 

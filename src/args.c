@@ -774,12 +774,17 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 			/* if no digits were found, we assume the
 			 * value is set by string reference */
 			XSTRDUP_ASSIGN(elem->strval, val);
+			if (!elem->strval)
+				return NULL;
 		}
 
 	}
 
 	elem->base = base;
+
 	XSTRDUP_ASSIGN(elem->name, name);
+	if (!elem->name)
+		return NULL;
 
 	PRINT_VERBOSE(cfg, 3, "enum elem %s = %d, strval %s, undef = %d\n",
 			elem->name, elem->val, elem->strval, elem->undef);
@@ -818,6 +823,8 @@ struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg,
 	}
 
 	XSTRDUP_ASSIGN(elem->name, name);
+	if (!elem->name)
+		return NULL;
 
 	PRINT_VERBOSE(cfg, 3, "bm_enum elem %s = %d\n", elem->name, elem->val);
 	return elem;
@@ -920,7 +927,10 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 
 			snprintf(nbuf, sizeof(nbuf), "%s%zu", ANON_PREFIX, argno);
 			XFREE(arg->name);
+
 			XSTRDUP_ASSIGN(arg->name, nbuf);
+			if (!arg->name)
+				return -1;
 		}
 
 	}
@@ -1054,6 +1064,9 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 	if (bitmask || fmt || modifier) {
 		XSTRDUP_ASSIGN(name_copy, name);
+		if (!name_copy)
+			return NULL;
+
 		bitmask = strchr(name_copy, '|');
 		fmt = strchr(name_copy, '/');
 
@@ -1145,6 +1158,8 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 	}
 
 	XSTRDUP_ASSIGN(arg->name, name);
+	if (!arg->name)
+		return NULL;
 
 	/* If the type is already a pointer (could be for typedef), 
 	   give it a chance to show up. There's only one pointer for 
@@ -1152,11 +1167,17 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 	if (!arg->pointer)
 		arg->pointer = pointer;
 
-	if (fmt && *fmt)
+	if (fmt && *fmt) {
 		XSTRDUP_ASSIGN(arg->fmt, fmt);
+		if (!arg->fmt)
+			return NULL;
+	}
 
-	if (bitmask)
+	if (bitmask) {
 		XSTRDUP_ASSIGN(arg->bitmask_class, bitmask);
+		if (!arg->bitmask_class)
+			return NULL;
+	}
 
 	if (collapsed)
 		arg->collapsed = collapsed;
@@ -1200,7 +1221,11 @@ int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base,
 	args_def_typedef[i = args_def_typedef_cnt++] = *arg;
 
 	arg = &args_def_typedef[i];
+
 	XSTRDUP_ASSIGN(arg->type_name, new);
+	if (!arg->type_name)
+		return -1;
+
 	arg->pointer = pointer;
 
 	lt_init_list_head(&arg->args_list);
@@ -1221,6 +1246,9 @@ int lt_args_init(struct lt_config_shared *cfg)
 			size_t fsize = strlen(env_dir) + 16;
 
 			XMALLOC_ASSIGN(file, fsize);
+			if (!file)
+				return -1;
+
 			memset(file, 0, fsize);
 			snprintf(file, fsize, "%s/latrace.h", env_dir);
 		} else
@@ -1291,9 +1319,12 @@ STATIC char *massage_string(const char *s)
 #ifdef USE_GLIBC_FEATURES
 	XMALLOC_ASSIGN(result, rlen);
 #else
-	rlen = 4096;
+	rlen = 2048;
 	result = safe_malloc(rlen);
 #endif
+	if (!result)
+		return NULL;
+
 	memset(result, 0, rlen);
 
 	for (i = 0, d_i = 0; i < slen; i++) {
@@ -1397,7 +1428,7 @@ STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 				size_t off = 0;
 
 				if (cfg->resolve_syms) {
-					aname = get_address_mapping(ptr, &off);
+					aname = get_address_mapping(ptr, NULL, &off);
 
 					if (!aname) {
 						aname = resolve_sym(ptr, 0, abuf, sizeof(abuf), NULL);
@@ -1407,6 +1438,7 @@ STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 				}
 
 				if (cfg->resolve_syms && aname) {
+					char dbuf[256] = { 0 };
 					const char *fmt_on = "", *fmt_off = "";
 					int demangled = 0;
 
@@ -1415,8 +1447,16 @@ STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 						fmt_off = BOLDOFF;
 					}
 
-					if (cfg->demangle)
-						DEMANGLE(aname, demangled);
+					if (cfg->demangle) {
+//						DEMANGLE(aname, demangled);
+
+						memset(dbuf, 0, sizeof(dbuf));
+						_safe_demangle(aname, dbuf, sizeof(dbuf));
+
+						if (dbuf[0])
+							aname = dbuf;
+
+					}
 
 					if (off)
 						len = snprintf(argbuf, alen, "%s%s+%zu%s", fmt_on, aname, off, fmt_off);
@@ -1523,9 +1563,16 @@ do {                                                                 \
 
 				if (val) {
 					char *s = massage_string(val);
-					int slen = strlen(s);
+					int slen;
 					int left = alen;
 					int info_len = 0;
+
+					if (!s) {
+						len = snprintf(argbuf, alen, "[error reading string]");
+						goto out;
+					}
+
+					slen = strlen(s);
 
 					if (lt_sh(cfg, args_string_pointer_length)) {
 						info_len = snprintf(argbuf, left, "(%p, %zu) ", s, strlen(s));

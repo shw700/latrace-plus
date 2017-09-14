@@ -197,7 +197,7 @@ buffer_output_data(pid_t tid, const char *output, int nest_level, int do_prefix)
 
 	if (!tb) {
 
-		XMALLOC_ASSIGN(tb, sizeof(thread_buffer_t));
+		XMALLOC_ASSIGN(tb, sizeof(*tb));
 		if (!tb) {
 			PRINT_ERROR("%s", "Error: unable to allocate memory for output buffer");
 			pthread_mutex_unlock(&threadbuf_lock);

@@ -44,7 +44,6 @@ int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 		}
 
 		XMALLOC_ASSIGN(t->sym_array, t->sym_max * sizeof(struct lt_stats_sym*));
-
 		if (!t->sym_array) {
 			perror("xmalloc failed");
 			return -1;
@@ -69,7 +68,6 @@ int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 	}
 
 	XREALLOC_ASSIGN(t->sym_array, t->sym_array, (t->sym_max * sizeof(struct lt_stats_sym*)));
-
 	if (!t->sym_array) {
 		perror("realloc failed");
 		return -1;
@@ -108,8 +106,12 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 	jmp_buf env;
 	int realloc = 0;
 
-	sprintf(buf, "%s%s", m->data + m->sym, m->data + m->lib);
+	snprintf(buf, sizeof(buf), "%s%s", m->data + m->sym, m->data + m->lib);
+
 	XSTRDUP_ASSIGN(e.key, buf);
+	if (!e.key)
+		return -1;
+
 	e.data = 0;
 
 	/* array got out of space */
@@ -131,6 +133,9 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 
 	if (!ep->data) {
 		XMALLOC_ASSIGN(sym, sizeof(struct lt_stats_sym));
+		if (!sym)
+			return -1;
+
 		memset(sym, 0, sizeof(struct lt_stats_sym));
 
 		ep->data = sym;
@@ -138,6 +143,9 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 		sym->name = e.key;
 		XSTRDUP_ASSIGN(sym->sym, (m->data + m->sym));
 		XSTRDUP_ASSIGN(sym->lib, (m->data + m->lib));
+
+		if (!sym->sym || !sym->lib)
+			return -1;
 
 		t->sym_array[t->sym_cnt] = sym;
 		t->sym_cnt++;

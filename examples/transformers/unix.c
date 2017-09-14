@@ -6,7 +6,7 @@
 
 
 
-void misc_transformer_init() __attribute__((constructor));
+void unix_transformer_init() __attribute__((constructor));
 const char *call_lookup_addr(void *addr, char *outbuf, size_t bufsize);
 void call_lookup_bitmask_by_class(const char *class, unsigned long val, const char *fmt, char *buf, size_t bufsize);
 
@@ -20,9 +20,9 @@ int latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t bufsize);
 int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 
 
-void misc_transformer_init()
+void unix_transformer_init()
 {
-	fprintf(stderr, "Initializing miscellaneous transformers module.\n");
+	fprintf(stderr, "Initializing UNIX/libc transformers module.\n");
 
 	sym_lookup_addr = (void *) dlsym(NULL, "lookup_addr");
 	sym_lookup_bitmask_by_class = (void *) dlsym(NULL, "lookup_bitmask_by_class");

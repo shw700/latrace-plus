@@ -149,6 +149,9 @@ STATIC int sym_entry(const char *symname, void *ptr,
 #else
 	argbuf = alloca(LR_ARGS_MAXLEN);
 #endif
+	if (!argbuf)
+		return -1;
+
 	memset(argbuf, 0, LR_ARGS_MAXLEN);
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
@@ -276,6 +279,9 @@ STATIC int sym_exit(const char *symname, void *ptr, char *lib_from, char *lib_to
 #else
 	argbuf = alloca(LR_ARGS_MAXLEN);
 #endif
+	if (!argbuf)
+		return -1;
+
 	memset(argbuf, 0, LR_ARGS_MAXLEN);
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
@@ -660,7 +666,7 @@ int thread_tls_mark(pid_t tid, int set)
 		return found;
 	}
 
-	res = (int)GETSPECIFIC(tid, PKEY_ID_MARK_TLS, &found);
+	res = (uintptr_t)GETSPECIFIC(tid, PKEY_ID_MARK_TLS, &found);
 
 	if (!found)
 		return 0;
@@ -719,6 +725,11 @@ thread_get_tsd(int create)
 		lt_tsd_t *tsd;
 
 		XMALLOC_ASSIGN(tsd, sizeof(lt_tsd_t));
+		if (!tsd) {
+			PRINT_ERROR("Error creating TSD: %s\n", strerror(errno));
+			return NULL;
+		}
+
 		memset(tsd, 0, sizeof(*tsd));
 		tsd->last_operation = -1;
 		this_tsd = pkd = tsd;
@@ -746,7 +757,12 @@ thread_get_tsd(int create)
 		lt_tsd_t *tsd;
 
 		//XMALLOC_ASSIGN(tsd, sizeof(lt_tsd_t));
-		tsd = safe_malloc(4096);
+		tsd = safe_malloc(sizeof(*tsd));
+		if (!tsd) {
+			PRINT_ERROR("Error creating TSD: %s\n", strerror(errno));
+			return NULL;
+		}
+
 		memset(tsd, 0, sizeof(*tsd));
 		tsd->last_operation = -1;
 		pkd = tsd;
@@ -812,6 +828,7 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 	else if (!strcmp(symname, "__call_tls_dtors")) {
 		PRINT_ERROR("Program appears to be shutting down... skipping tracing of internal function %s() / TID %d\n", symname, this_thread);
 		thread_tls_mark(this_thread, 1);
+		SETSPECIFIC(this_thread, PKEY_ID_THREAD_STATE, PKEY_VAL_TLS_BAD, NULL);
 		return sym->st_value;
 	}
 
@@ -861,8 +878,8 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 			excised = GETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL);
 
 			if (!excised) {
-				excised = safe_malloc(4096);
-				memset(excised, 0, 4096);
+				excised = safe_malloc(4000);
+				memset(excised, 0, 4000);
 			}
 
 			elen = strlen(excised);
@@ -870,7 +887,7 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 			if (elen)
 				prefix = "; ";
 
-			eleft = 4096 - elen;
+			eleft = 4000 - elen;
 			snprintf(&excised[elen], eleft, "%s%s(): cannot track function with TLS in volatile state", prefix, symname);
 			SETSPECIFIC(this_thread, PKEY_ID_EXCISED, excised, NULL);
 		}
@@ -1078,7 +1095,7 @@ crash_handler_si(int signo, siginfo_t *si, void *ucontext)
 {
 	mcontext_t mcontext;
 	const char *more_info = "additional information unavailable";
-	unsigned long pc, *fp;
+	unsigned long pc, *fp, fp_diff = 0;
 	static int gdb_once = 0;
 
 	if (signo == SIGSEGV) {
@@ -1110,7 +1127,7 @@ crash_handler_si(int signo, siginfo_t *si, void *ucontext)
 	PRINT_ERROR_SAFE("Warning: bytes at instruction pointer: %.2x %.2x %.2x %.2x\n", pcb[0], pcb[1], pcb[2], pcb[3]);
 	triangulate_pc(pc);
 
-	size_t level = 0;
+	size_t level = 1;
 	int do_exit = 0;
 
 	while (pc && fp) {
@@ -1120,12 +1137,20 @@ crash_handler_si(int signo, siginfo_t *si, void *ucontext)
 		resolve_sym((void *)pc, 0, tmpbuf, sizeof(tmpbuf), &fname);
 		PRINT_ERROR_SAFE("BACKTRACE / %zu %p <%s> (%s)\n", level++, (void *)pc, tmpbuf, fname);
 		pc = fp[1];
+		fp_diff = ((unsigned long)fp > fp[0]) ? (unsigned long)fp - fp[0]: fp[0] - (unsigned long)fp;
 		fp = (unsigned long *)fp[0];
 
-		if (pc && !fp) {
+		if (fp_diff > 0x100000) {
+			PRINT_ERROR_SAFE("BACKTRACE warning: next frame pointer (%p) is far off last one (%zu bytes); aborting trace.\n",
+				fp, fp_diff);
+			break;
+		}
+
+		if (!pc || !fp) {
 			resolve_sym((void *)pc, 0, tmpbuf, sizeof(tmpbuf), &fname);
 			PRINT_ERROR_SAFE("BACKTRACE FINAL (possibly spurious?)/ %zu %p <%s> (%s)\n", level++, (void *)pc, tmpbuf, fname);
 		}
+
 	}
 
 #ifdef USE_LIBUNWIND

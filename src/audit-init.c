@@ -264,6 +264,9 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 		gdsize = strlen(gsrc) + 8;
 
 		XMALLOC_ASSIGN(globdir, gdsize);
+		if (!globdir)
+			return -1;
+
 		memset(globdir, 0, gdsize);
 		snprintf(globdir, gdsize, "%s/*.so", gsrc);
 	}
@@ -360,6 +363,12 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					}
 
 					XSTRDUP_ASSIGN(e.key, funcname);
+					if (!e.key) {
+						perror("strdup");
+						dlclose(handle);
+						return -1;
+					}
+
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_struct_xfm_tab)) {
@@ -383,6 +392,12 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					}
 
 					XSTRDUP_ASSIGN(e.key, funcname);
+					if (!e.key) {
+						perror("strdup");
+						dlclose(handle);
+						return -1;
+					}
+
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_xfm_tab)) {
@@ -406,6 +421,12 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					}
 
 					XSTRDUP_ASSIGN(e.key, funcname);
+					if (!e.key) {
+						perror("strdup");
+						dlclose(handle);
+						return -1;
+					}
+
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_intercept_tab)) {

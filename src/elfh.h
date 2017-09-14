@@ -15,7 +15,7 @@ const char *lookup_addr(void *addr);
 void *get_sym_addr(symbol_mapping_t *map, size_t sz, const char *name);
 const char *get_addr_name(symbol_mapping_t *map, size_t sz, void *addr);
 
-const char *get_address_mapping(void *symaddr, size_t *offset);
+const char *get_address_mapping(void *symaddr, size_t *size, size_t *offset);
 void add_address_mapping(void *symaddr, size_t size, const char *name);
 void remove_address_mapping(void *symaddr, size_t size, const char *hint);
 
