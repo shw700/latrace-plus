@@ -101,10 +101,10 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 
 	if (!addr_mapping_size) {
 		addr_mapping_size = 128;
-		addr_mappings = malloc(sizeof(*addr_mappings) * addr_mapping_size);
+		XMALLOC_ASSIGN(addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
 	} else if (addr_mapping_used == addr_mapping_size) {
 		addr_mapping_size *= 2;
-		addr_mappings = realloc(addr_mappings, sizeof(*addr_mappings) * addr_mapping_size);
+		XREALLOC_ASSIGN(addr_mappings, addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
 	}
 
 	ind = bsearch_address_mapping_unlocked(symaddr, size, &insert);
@@ -116,13 +116,13 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 
 		addr_mappings[ind].addr = symaddr;
 		addr_mappings[ind].size = size;
-		addr_mappings[ind].name = strdup(name);
+		XSTRDUP_ASSIGN(addr_mappings[ind].name, name);
 		addr_mapping_used++;
 	} else {
 		// For now, only permit a perfect overwrite
 		if ((addr_mappings[ind].addr == symaddr) && (addr_mappings[ind].size == size)) {
-			free(addr_mappings[ind].name);
-			addr_mappings[ind].name = strdup(name);
+			XFREE(addr_mappings[ind].name);
+			XSTRDUP_ASSIGN(addr_mappings[ind].name, name);
 		}
 
 	}
@@ -153,7 +153,7 @@ remove_address_mapping(void *symaddr, size_t size, const char *hint) {
 		// Freeing the whole thing or part of it?
 		// Free the whole thing if our size requests match, or if size==0 was specified
 		if ((addr_mappings[ind].addr == caddr) && ((size == addr_mappings[ind].size) || !size)) {
-			free(addr_mappings[ind].name);
+			XFREE(addr_mappings[ind].name);
 			memmove(&addr_mappings[ind], &addr_mappings[ind+1], sizeof(addr_mappings[0]) * (addr_mapping_used-(ind+1)));
 			addr_mapping_used--;
 		} else {
@@ -319,9 +319,10 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 	}
 
 	rsize = strtab_size + (nsyms * sizeof(symbol_mapping_t));
-	
-	if (!(result = malloc(rsize))) {
-		perror("malloc");
+
+	XMALLOC_ASSIGN(result, rsize);
+	if (!result) {
+		perror("xmalloc");
 		return 0;
 	}
 
@@ -389,4 +390,38 @@ get_addr_name(symbol_mapping_t *map, size_t sz, void *addr) {
 	}
 
 	return NULL;
+}
+
+char *resolve_sym(void *addr, int exact, char *buf, size_t buflen, const char **filename)
+{
+	Dl_info dinfo;
+
+	memset(buf, 0, buflen);
+
+	if (!dladdr(addr, &dinfo))
+		return NULL;
+
+	if (!dinfo.dli_saddr)
+		return NULL;
+
+	if (filename)
+		*filename = dinfo.dli_fname;
+
+	if (dinfo.dli_saddr == addr)
+		strncpy(buf, dinfo.dli_sname, buflen);
+	else if (exact)
+		return NULL;
+	else {
+		char dbuf[16];
+		long int diff = (unsigned long)addr - (unsigned long)dinfo.dli_saddr;
+
+		if (diff < 0)
+			snprintf(dbuf, sizeof(dbuf), "-0x%lx", 0-diff);
+		else
+			snprintf(dbuf, sizeof(dbuf), "+0x%lx", diff);
+
+		snprintf(buf, buflen, "%s%s", dinfo.dli_sname, dbuf);
+	}
+
+	return buf;
 }

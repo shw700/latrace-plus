@@ -29,15 +29,16 @@ struct lt_thread *lt_thread_add(struct lt_config_app *cfg, int fd, pid_t pid)
 {
 	struct lt_thread *t;
 
-	if (NULL == (t = (struct lt_thread*) malloc(sizeof(struct lt_thread)))) {
-		perror("malloc failed");
+	XMALLOC_ASSIGN(t, sizeof(*t));
+	if (!t) {
+		perror("xmalloc failed");
 		return NULL;
 	}
 
 	memset(t, 0x0, sizeof(*t));
 
 	if (-1 == lt_stats_alloc(cfg, t)) {
-		free(t);
+		XFREE(t);
 		return NULL;
 	}
 

@@ -165,10 +165,12 @@ int lt_args_init(struct lt_config_shared *cfg);
 struct lt_args_sym* lt_args_sym_get(struct lt_config_shared *cfg,
 					const char *sym);
 int lt_args_sym_entry(struct lt_config_shared *cfg, struct lt_symbol *sym,
-			La_regs *regs, char **argbuf, char **argdbuf, int silent);
+			La_regs *regs, char *argbuf, size_t argblen,
+			char **argdbuf, int silent, lt_tsd_t *tsd);
 int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 			La_regs *inregs, La_retval *outregs,
-			char **argbuf, char **argdbuf, int silent);
+			char *argbuf, size_t argblen, char **argdbuf,
+			int silent, lt_tsd_t *tsd);
 int lt_args_add_enum(struct lt_config_shared *cfg, char *name, int bitmask,
 			struct lt_list_head *h);
 int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
@@ -194,9 +196,10 @@ int lt_args_cb_struct(struct lt_config_shared *cfg, int type,
 
 /* stack handling */
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_regs *regs, struct lt_args_data *data, int silent);
+			La_regs *regs, struct lt_args_data *data, int silent,
+			lt_tsd_t *tsd);
 int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			La_regs *iregs, La_retval *regs, struct lt_args_data *data,
-			int silent);
+			int silent, lt_tsd_t *tsd);
 
 #endif /* ARGS_H */

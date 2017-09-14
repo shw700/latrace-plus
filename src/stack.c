@@ -6,10 +6,8 @@
 
 #include "config.h"
 
-static __thread void *stack_start = NULL;
-static __thread void *stack_end   = NULL;
 
-static unsigned long get_stack_size(struct lt_config_audit *cfg)
+STATIC unsigned long get_stack_size(struct lt_config_audit *cfg)
 {
 	struct rlimit rlim;
 
@@ -23,7 +21,7 @@ static unsigned long get_stack_size(struct lt_config_audit *cfg)
 }
 
 /* find and update current stack boundaries */
-static int load_stack(struct lt_config_audit *cfg, void *sp)
+STATIC int load_stack(struct lt_config_audit *cfg, void *sp, lt_tsd_t *tsd)
 {
 	FILE *maps;
 	char line[128];
@@ -77,15 +75,15 @@ static int load_stack(struct lt_config_audit *cfg, void *sp)
 	fclose(maps);
 
 	if (found) {
-		stack_start = start;
-		stack_end   = end;
+		tsd->stack_start = start;
+		tsd->stack_end   = end;
 	}
 
 	return found ? 0 : -1;
 }
 
 /* check the current stack pointer and check its boundaries */
-int lt_stack_framesize(struct lt_config_audit *cfg, La_regs *regs)
+int lt_stack_framesize(struct lt_config_audit *cfg, La_regs *regs, lt_tsd_t *tsd)
 {
 	void *sp_top, *sp_bottom;
 	void *sp = (void*) regs->sp_reg;
@@ -95,19 +93,19 @@ int lt_stack_framesize(struct lt_config_audit *cfg, La_regs *regs)
 		return framesize;
 
 	/* got here first time, or we are out of bounds */
-	if (!stack_start ||
-	    (sp < stack_start || sp > stack_end)) {
+	if (!tsd->stack_start ||
+	    (sp < tsd->stack_start || sp > tsd->stack_end)) {
 
 		/* we are screeeeeewed */
-		if (load_stack(cfg, sp))
+		if (load_stack(cfg, sp, tsd))
 			return framesize;
 	}
 
 	/* FIXME what about stacks growing up.. */
 	sp_top = sp + framesize;
 
-	if (sp_top > stack_end) {
-		framesize = stack_end - sp - sizeof(void*);
+	if (sp_top > tsd->stack_end) {
+		framesize = tsd->stack_end - sp - sizeof(void*);
 		PRINT_VERBOSE(cfg, 1,
 			"top reached, framesize changed to %lu\n",
 			framesize);
@@ -115,8 +113,8 @@ int lt_stack_framesize(struct lt_config_audit *cfg, La_regs *regs)
 
 	sp_bottom = sp - framesize;
 
-	if (sp_bottom < stack_start) {
-		framesize = sp - stack_start;
+	if (sp_bottom < tsd->stack_start) {
+		framesize = sp - tsd->stack_start;
 		PRINT_VERBOSE(cfg, 1,
 			"bottom reached, framesize changed to %lu\n",
 			framesize);

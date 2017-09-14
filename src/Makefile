@@ -31,7 +31,8 @@ AUDIT_OBJS=\
 	src/stack.o \
 	src/symbol.o \
 	src/elf.o \
-	src/lib-include.o
+	src/lib-include.o \
+	src/safety.o
 
 ifeq ($(CONFIG_ARCH_HAVE_ARGS),y)
 AUDIT_OBJS+=\
@@ -71,7 +72,8 @@ LATRACE_OBJS=\
 	src/config-bison.o \
 	src/config-flex.o \
 	src/lib-include.o \
-	src/tty.o
+	src/tty.o \
+	src/safety.o
 
 OBJS+=$(LATRACE_OBJS)
 PROGRAMS+=$(LATRACE_BIN)
@@ -86,7 +88,7 @@ OBJS_DEPS_OMIT+=\
 	src/config-flex.o
 
 $(LATRACE_BIN): $(LATRACE_OBJS)
-	$(QUIET_LD)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LATRACE_LIB)
+	$(QUIET_LD)$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LATRACE_LIB) -DUSE_GLIBC_FEATURES=1
 
 install::
 	$(call install,$(LATRACE_BIN),$(bindir),755)

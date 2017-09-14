@@ -24,14 +24,17 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <search.h>
 #include <sys/time.h>
 #include <sys/syscall.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <sys/mman.h>
 
 #include "audit.h"
 #include "list.h"
+
 
 #define TRANSFORMER_CRASH_PROTECTION 1
 #define TRANSFORMER_CRASH_PROTECTION_ENHANCED 1
@@ -39,7 +42,11 @@
 #ifdef TRANSFORMER_CRASH_PROTECTION
 #include <signal.h>
 #include <setjmp.h>
+#include <ucontext.h>
 #endif
+
+#define STATIC static
+//#define STATIC 
 
 #define CODE_LOC_LA_TRANSFORMER	1
 #define CODE_LOC_LA_INTERCEPT	2
@@ -53,6 +60,51 @@
 #define CODE_LOC_LA_SYMBIND_NATIVE	17
 #define CODE_LOC_LA_PLTENTER	18
 #define CODE_LOC_LA_PLTEXIT	19
+
+typedef struct function_call {
+	char *fn_name;
+	La_regs registers;
+	void **args;
+	size_t argcnt;
+} fn_call_t;
+
+#define SUPPRESS_FN_LEN		128
+typedef struct lt_tsd {
+	char suppress_while[SUPPRESS_FN_LEN];
+	int suppress_collapsed;
+	int suppress_nested;
+	size_t nsuppressed;
+
+#ifdef TRANSFORMER_CRASH_PROTECTION
+	jmp_buf crash_insurance;
+	int jmp_set;
+	const char *last_symbol;
+#endif
+	int last_operation;
+	char *fault_reason;
+
+	int ass_integer;
+	int ass_sse;
+	int ass_memory;
+
+	fn_call_t *xfm_call_stack;
+	size_t xfm_call_stack_max;
+	size_t xfm_call_stack_sz;
+
+	int pipe_fd;
+	int indent_depth;
+	int flow_below_stack;
+
+	char *excised;
+
+	void *stack_start;
+	void *stack_end;
+} lt_tsd_t;
+
+#define TSD_SET(memb,val)	do { if (tsd) tsd->memb = val; } while (0)
+#define TSD_GET(memb,defval)	(tsd ? tsd->memb : defval)
+extern lt_tsd_t *thread_get_tsd(int create);
+
 
 #ifdef CONFIG_ARCH_HAVE_ARGS
 #include "args.h"
@@ -329,6 +381,7 @@ struct lt_thread {
         pid_t tid;
 
 	int indent_depth;
+	size_t nsuppressed;
 
 	/* start/stop time */
 	struct timeval tv_start;
@@ -387,11 +440,11 @@ struct lt_thread *lt_thread_next(struct lt_config_app *cfg);
 int lt_out_entry(struct lt_config_shared *cfg, struct timeval *tv,
 		pid_t tid, int indent_depth, int collapsed,
 		const char *symname, char *lib_to,
-		char *argbuf, char *argdbuf);
+		char *argbuf, char *argdbuf, size_t *nsuppressed);
 int lt_out_exit(struct lt_config_shared *cfg, struct timeval *tv,
 		pid_t tid, int indent_depth, int collapsed,
 		const char *symname, char *lib_to,
-		char *argbuf, char *argdbuf);
+		char *argbuf, char *argdbuf, size_t *nsuppressed);
 
 /* la_objsearch */
 int lt_objsearch_init(struct lt_config_audit *cfg, char **ptr, int cnt);
@@ -399,7 +452,7 @@ char* lt_objsearch(struct lt_config_audit *cfg, const char *name,
 		uintptr_t *cookie, unsigned int flag);
 
 /* stack */
-int lt_stack_framesize(struct lt_config_audit *cfg, La_regs *regs);
+int lt_stack_framesize(struct lt_config_audit *cfg, La_regs *regs, lt_tsd_t *tsd);
 
 /* symbol */
 struct lt_symbol* lt_symbol_bind(struct lt_config_shared *cfg,
@@ -443,6 +496,8 @@ do { \
 #define RESET   "\033[0m"
 #define BOLD	"\033[1m"
 #define BOLDOFF	"\033[22m"
+#define INVERT	"\033[7m"
+#define INVOFF	"\033[27m"
 #define BLACK   "\033[30m"      /* Black */
 #define RED     "\033[31m"      /* Red */
 #define GREEN   "\033[32m"      /* Green */
@@ -461,7 +516,50 @@ do { \
 #define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
 
 #define PRINT_COLOR(color, fmt, ...)	fprintf(stderr, color fmt RESET, __VA_ARGS__)
-#define PRINT_ERROR(fmt, ...)		PRINT_COLOR(BOLDRED, fmt, __VA_ARGS__)
+//#define PRINT_ERROR(fmt, ...)		PRINT_COLOR(BOLDRED, fmt, __VA_ARGS__)
+#define PRINT_ERROR	PRINT_ERROR_SAFE
+#define PRINT_ERROR_SAFE(fmt, ...)	do { char buf[1024]; memset(buf, 0, sizeof(buf));	\
+					snprintf(buf, sizeof(buf), BOLDRED fmt RESET, __VA_ARGS__);	\
+					write(2, buf, strlen(buf)); } while (0)
+
+
+//#define USE_GLIBC_FEATURES	1
+
+extern int glibc_unsafe;
+
+extern void *xmalloc(size_t size);
+extern void *xrealloc(void *ptr, size_t size);
+extern char *xstrdup(const char *s);
+extern void _print_backtrace(void);
+
+extern void *safe_malloc(size_t size);
+extern void safe_free(void *ptr);
+//#define safe_malloc(size)	mmap(NULL, (size < 4096 ? 4096 : size), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)
+//#define safe_free(ptr)	munmap(ptr, 4096)
+
+#ifdef USE_GLIBC_FEATURES
+	#define XMALLOC_ASSIGN(val,parm)	do { val = xmalloc(parm); } while (0)
+	#define XREALLOC_ASSIGN(val,p1,p2)	do { val = xrealloc(p1,p2); } while (0)
+	#define XSTRDUP_ASSIGN(val,parm)	do { val = xstrdup(parm); } while (0)
+	#define XFREE(parm)			free(parm)
+#else
+	#define SAFETY_WARNING(func)		if (glibc_unsafe) {	\
+							/* PRINT_ERROR("Warning: potentially unsafe call to %s() from line %d, file %s\n", func, __LINE__, __FILE__); */	\
+							/*_print_backtrace(); */ \
+						}
+	#define XMALLOC_ASSIGN(val,parm)	do {	\
+							SAFETY_WARNING("malloc");	\
+							val = xmalloc(parm); } while (0)
+	#define XREALLOC_ASSIGN(val,p1,p2)	do {	\
+							SAFETY_WARNING("realloc");	\
+							val = xrealloc(p1,p2); } while (0)
+	#define XSTRDUP_ASSIGN(val,parm)	do {	\
+							SAFETY_WARNING("strdup");	\
+							val = xstrdup(parm); } while (0)
+	#define XFREE(parm)			do {	\
+							SAFETY_WARNING("free");	\
+							free(parm); } while (0)
+#endif
 
 
 /* libiberty external */

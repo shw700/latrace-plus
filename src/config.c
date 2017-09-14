@@ -28,6 +28,7 @@
 #include "config.h"
 #include "lib-include.h"
 
+
 extern FILE *lt_config_in;
 int  lt_config_parse();
 void lt_config__switch_to_buffer (YY_BUFFER_STATE new_buffer  );
@@ -397,7 +398,7 @@ struct lt_config_opt *lt_config_opt_new(struct lt_config_app *cfg,
 {
 	struct lt_config_opt *opt;
 
-	opt = malloc(sizeof(*opt));
+	XMALLOC_ASSIGN(opt, sizeof(*opt));
 	if (!opt)
 		return NULL;
 
@@ -413,12 +414,13 @@ struct lt_config_opt *lt_config_opt_new(struct lt_config_app *cfg,
 
 int lt_config_ln_add(struct lt_list_head *head, char *name)
 {
-	struct lt_config_ln *ln = malloc(sizeof(*ln));
+	struct lt_config_ln *ln;
 
+	XMALLOC_ASSIGN(ln, sizeof(*ln));
         if (!ln)
                 return -1;
 
-        ln->name = strdup(name);
+	XSTRDUP_ASSIGN(ln->name, name);
         lt_init_list_head(&ln->list);
         lt_list_add_tail(&ln->list, head);
 	return 0;
@@ -447,8 +449,8 @@ int lt_config_ln_fill(struct lt_list_head *head, char *buf, int size)
 		first = 0;
 
 		lt_list_del(&ln->list);
-		free(ln->name);
-		free(ln);
+		XFREE(ln->name);
+		XFREE(ln);
         }
 
         return 0;

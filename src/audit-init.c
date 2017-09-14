@@ -26,7 +26,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <string.h>
-#include <sys/mman.h>
 #include <errno.h>
 
 #include <libelf.h>
@@ -264,7 +263,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 		gdsize = strlen(gsrc) + 8;
 
-		globdir = malloc(gdsize);
+		XMALLOC_ASSIGN(globdir, gdsize);
 		memset(globdir, 0, gdsize);
 		snprintf(globdir, gdsize, "%s/*.so", gsrc);
 	}
@@ -360,7 +359,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 						continue;
 					}
 
-					e.key = strdup(funcname);
+					XSTRDUP_ASSIGN(e.key, funcname);
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_struct_xfm_tab)) {
@@ -383,7 +382,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 						continue;
 					}
 
-					e.key = strdup(funcname);
+					XSTRDUP_ASSIGN(e.key, funcname);
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_xfm_tab)) {
@@ -406,7 +405,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 						continue;
 					}
 
-					e.key = strdup(funcname);
+					XSTRDUP_ASSIGN(e.key, funcname);
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_intercept_tab)) {

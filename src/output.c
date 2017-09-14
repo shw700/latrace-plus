@@ -28,7 +28,6 @@
 #include "config.h"
 
 
-static __thread size_t nsuppressed = 0;
 static char spaces[] = "                                                                                                                                                                           ";
 
 
@@ -126,10 +125,10 @@ sprintf_cat(char *buf, size_t bufsize, char *fmt, ...)
 		return NULL;
 
 	if (!buf)
-		result = strdup(tmpbuf);
+		XSTRDUP_ASSIGN(result, tmpbuf);
 	else {
 		nsize = strlen(buf) + csize + 1;
-		result = realloc(buf, nsize);
+		XREALLOC_ASSIGN(result, buf, nsize);
 		strncat(result, tmpbuf, csize);
 	}
 
@@ -165,9 +164,9 @@ buffer_output_data(pid_t tid, const char *output, int nest_level, int do_prefix)
 	nlen += strlen(output) + 1;
 
 	if (was_empty)
-		outbuf = malloc(nlen);
+		XMALLOC_ASSIGN(outbuf, nlen);
 	else
-		outbuf = realloc(tb->buf, nlen);
+		XREALLOC_ASSIGN(outbuf, tb->buf, nlen);
 
 	if (!outbuf) {
 		PRINT_ERROR("%s", "Error: unable to allocate memory for output buffer");
@@ -198,7 +197,8 @@ buffer_output_data(pid_t tid, const char *output, int nest_level, int do_prefix)
 
 	if (!tb) {
 
-		if (!(tb = (thread_buffer_t *)malloc(sizeof(thread_buffer_t)))) {
+		XMALLOC_ASSIGN(tb, sizeof(thread_buffer_t));
+		if (!tb) {
 			PRINT_ERROR("%s", "Error: unable to allocate memory for output buffer");
 			pthread_mutex_unlock(&threadbuf_lock);
 			return;
@@ -235,10 +235,10 @@ pop_output_data(pid_t tid)
 		tb->buf = NULL;
 		tb->last_nested = 0;
 
-		if (tb != thread_buffers) {
+/*		if (tb != thread_buffers) {
 			tb->next = thread_buffers;
 			thread_buffers = tb;
-		}
+		} */
 
 	}
 
@@ -250,7 +250,8 @@ int lt_out_entry(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
 			int indent_depth, int collapsed,
 			const char *symname, char *lib_to,
-			char *argbuf, char *argdbuf)
+			char *argbuf, char *argdbuf,
+			size_t *nsuppressed)
 {
 	const char *cur_color = NULL;
 	const char *end_line = "{\n";
@@ -262,12 +263,34 @@ int lt_out_entry(struct lt_config_shared *cfg,
 
 	/* Would probably be helpful to pre-allocate buffer for data and not constantly resize it */
 /*	if (buffered) {
-		outbuf = malloc(8192);
+		XMALLOC_ASSIGN(outbuf, 8192);
 		memset(outbuf, 0, sizeof(outbuf));
 	} */
 
+	if (!symname && argbuf && *argbuf) {
+		char *fmt_on = "", *fmt_off = "";
+
+		if (cfg->timestamp && tv)
+			FPRINT_TIME(tv);
+
+		if (!cfg->hide_tid)
+			FPRINT_TID(tid);
+
+		if (indent_depth && cfg->indent_sym)
+			fprintf(cfg->fout, "%.*s", indent_depth * cfg->indent_size, spaces);
+
+		if (cfg->fmt_colors) {
+			fmt_on = BOLDRED;
+			fmt_off = RESET;
+		}
+
+		fprintf(cfg->fout, "[%s%s%s]\n", fmt_on, argbuf, fmt_off);
+		fflush(NULL);
+		return 0;
+	}
+
 	if (collapsed && !symname) {
-		nsuppressed++;
+		(*nsuppressed)++;
 		return 0;
 	}
 
@@ -280,11 +303,11 @@ int lt_out_entry(struct lt_config_shared *cfg,
 		PRINT_DATA(buffered, "%s()", symname);
 
 		if (demangled)
-			free((char *)symname);
+			XFREE((char *)symname);
 
 		if (outbuf) {
 			buffer_output_data(tid, outbuf, indent_depth, 1);
-			free(outbuf);
+			XFREE(outbuf);
 		}
 
 		return 0;
@@ -349,7 +372,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 	}
 
 	if (demangled)
-		free((char*) symname);
+		XFREE((char*) symname);
 
 	/* Print arguments' details. */
 	if (cfg->args_detailed && *argdbuf)
@@ -359,7 +382,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 
 	if (outbuf) {
 		buffer_output_data(tid, outbuf, indent_depth, 0);
-		free(outbuf);
+		XFREE(outbuf);
 	}
 
 	return 0;
@@ -369,7 +392,8 @@ int lt_out_exit(struct lt_config_shared *cfg,
 			struct timeval *tv, pid_t tid,
 			int indent_depth, int collapsed,
 			const char *symname, char *lib_to,
-			char *argbuf, char *argdbuf)
+			char *argbuf, char *argdbuf,
+			size_t *nsuppressed)
 {
 	const char *cur_color = NULL;
 	char *prefix;
@@ -377,20 +401,27 @@ int lt_out_exit(struct lt_config_shared *cfg,
 
 	if ((prefix = pop_output_data(tid))) {
 
-		if (nsuppressed) {
-			char *eol = "";
+		if (*nsuppressed) {
+			char *label, *eol = "", *style_on = "", *style_off = "";
 
 			if (prefix[strlen(prefix)-1] == '\n') {
 				prefix[strlen(prefix)-1] = 0;
 				eol = "\n";
 			}
 
-			fprintf(cfg->fout, "%s {%zu suppressions}%s", prefix, nsuppressed, eol);
+			label = *nsuppressed == 1 ? "suppression" : "suppressions";
+
+			if (cfg->fmt_colors) {
+				style_on = INVERT;
+				style_off = INVOFF;
+			}
+
+			fprintf(cfg->fout, "%s %s{%zu %s}%s%s", prefix, style_on, *nsuppressed, label, style_off, eol);
 		} else
 			fprintf(cfg->fout, "%s", prefix);
 
-		free(prefix);
-		nsuppressed = 0;
+		XFREE(prefix);
+		*nsuppressed = 0;
 	}
 
 	if (!*argbuf && (!cfg->braces))
@@ -437,7 +468,7 @@ int lt_out_exit(struct lt_config_shared *cfg,
 	}
 
 	if (demangled)
-		free((char*) symname);
+		XFREE((char*) symname);
 
 	/* Print arguments' details. */
 	if (cfg->args_detailed && *argdbuf)

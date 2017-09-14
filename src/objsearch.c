@@ -20,6 +20,7 @@
 
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "config.h"
 
@@ -113,9 +114,10 @@ static int match_ptn(struct lt_config_audit *cfg, const char *name,
 	if (!pat)
 		return 0;
 
-	r = *ret = malloc(strlen(name) + strlen(s->dst));
+	XMALLOC_ASSIGN(*ret, (strlen(name) + strlen(s->dst)));
+	r = *ret;
 	if (!r) {
-		perror("malloc failed");
+		perror("xmalloc failed");
 		return 0;
 	}
 

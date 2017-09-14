@@ -18,3 +18,5 @@ const char *get_addr_name(symbol_mapping_t *map, size_t sz, void *addr);
 const char *get_address_mapping(void *symaddr, size_t *offset);
 void add_address_mapping(void *symaddr, size_t size, const char *name);
 void remove_address_mapping(void *symaddr, size_t size, const char *hint);
+
+char *resolve_sym(void *addr, int exact, char *buf, size_t buflen, const char **filename);

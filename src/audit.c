@@ -31,6 +31,8 @@
 #include <bits/wordsize.h>
 #include <gnu/lib-names.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <pthread.h>
 
 #include "config.h"
 #include "elfh.h"
@@ -38,22 +40,33 @@
 
 extern struct lt_config_audit cfg;
 
-static __thread int pipe_fd = 0;
-static __thread int flow_below_stack = 0;
-static __thread int indent_depth = 0;
-static __thread char suppress_while[128];
-static __thread int suppress_collapsed;
-static __thread int suppress_nested = 0;
-__thread char *fault_reason = NULL;
-#ifdef TRANSFORMER_CRASH_PROTECTION
-__thread jmp_buf crash_insurance;
-__thread int jmp_set;
-__thread int last_operation = -1;
-__thread const char *last_symbol = NULL;
+unsigned int thread_warning = 0;
+
+#define MAXPTIDS	256
+#define MAXIDX		3
+
+#define PKEY_VAL_INITIALIZED	(void *)0xc0ffee
+#define PKEY_VAL_TLS_BAD	(void *)0xdeadbeef
+
+#define PKEY_ID_THREAD_STATE	0
+#define PKEY_ID_TSD		1
+#define PKEY_ID_EXCISED		2
+#define PKEY_ID_MARK_TLS	3
+
+int lt_thread_pkey_init = 0;
+static pthread_key_t lt_thread_pkey, lt_tsd_pkey;
+pid_t master_thread = 0;
+
+#ifdef USE_GLIBC_FEATURES
+static __thread lt_tsd_t *this_tsd = NULL;
 #endif
 
+static pthread_mutex_t tsd_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static int check_names(char *name, char **ptr)
+lt_tsd_t *thread_get_tsd(int create);
+
+
+STATIC int check_names(char *name, char **ptr)
 {
 	char *n;
 	int matched = 0;
@@ -97,48 +110,60 @@ static int check_names(char *name, char **ptr)
 	return 0;
 }
 
-static int check_flow_below(const char *symname, int in)
+STATIC int check_flow_below(const char *symname, int in, lt_tsd_t *tsd)
 {
-	int ret = flow_below_stack;
+	int ret = tsd->flow_below_stack;
 
 	if (check_names((char*) symname, cfg.flow_below))
-		in ? ret = ++flow_below_stack : flow_below_stack--;
+		in ? ret = ++tsd->flow_below_stack : tsd->flow_below_stack--;
 
 	return ret;
 }
 
-static void free_argbuf(int argret, char *argbuf, char *argdbuf)
+STATIC void free_argbuf(int argret, char *argbuf, char *argdbuf)
 {
+#ifdef USE_GLIBC_FEATURES
+	XFREE(argbuf);
+#else
+//	safe_free(argbuf);
+#endif
+
 	if (argret)
 		return;
 
-	free(argbuf);
 	if (lt_sh(&cfg, args_detailed) && (*argdbuf))
-		free(argdbuf);
+		XFREE(argdbuf);
 }
 
-static int sym_entry(const char *symname, void *ptr,
-		     char *lib_from, char *lib_to, La_regs *regs)
+STATIC int sym_entry(const char *symname, void *ptr,
+		     char *lib_from, char *lib_to, La_regs *regs, lt_tsd_t *tsd)
 {
 	int argret = -1;
-	char *argbuf = "", *argdbuf = "";
+	char *argbuf, *argdbuf = "";
 	struct timeval tv;
 	struct lt_symbol *sym = NULL;
 	int collapsed = 0, set_suppress_collapsed = 0, is_silent = 0;
 
+#ifdef USE_GLIBC_FEATURES
+	XMALLOC_ASSIGN(argbuf, LR_ARGS_MAXLEN);
+#else
+	argbuf = alloca(LR_ARGS_MAXLEN);
+#endif
+	memset(argbuf, 0, LR_ARGS_MAXLEN);
+
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
 
 	// Make sure we keep track of recursive/repeated calls to ourselves.
-/*	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE)) {
-		if (!strcmp(suppress_while, symname))
-			suppress_nested++;
+/*	if (tsd->suppress_while[0] && (tsd->suppress_collapsed != COLLAPSED_TERSE)) {
+		if (!strcmp(tsd->suppress_while, symname))
+			tsd->suppress_nested++;
 
 		is_silent = 1;
 	} */
-	if (suppress_while[0] && (!strcmp(suppress_while, symname)))
-		suppress_nested++;
-//	if (suppress_while[0] && (suppress_collapsed != COLLAPSED_TERSE))
-	if (suppress_while[0])
+	if (tsd->suppress_while[0] && (!strcmp(tsd->suppress_while, symname)))
+		tsd->suppress_nested++;
+//	if (tsd->suppress_while[0] && (tsd->suppress_collapsed != COLLAPSED_TERSE))
+	if (tsd->suppress_while[0])
 		is_silent = 1;
 
 	if (is_silent) {
@@ -147,23 +172,23 @@ static int sym_entry(const char *symname, void *ptr,
 
 		if (sym && sym->args->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
 		#ifdef CONFIG_ARCH_HAVE_ARGS
-			argret = lt_args_sym_entry(cfg.sh, sym, regs, &argbuf, &argdbuf, is_silent);
+			argret = lt_args_sym_entry(cfg.sh, sym, regs, argbuf, LR_ARGS_MAXLEN, &argdbuf, is_silent, tsd);
 		#endif
 		}
 
-		if ((suppress_collapsed != COLLAPSED_NESTED) && (suppress_collapsed != COLLAPSED_TERSE))
+		if ((tsd->suppress_collapsed != COLLAPSED_NESTED) && (tsd->suppress_collapsed != COLLAPSED_TERSE))
 			symname = "";
 
 		collapsed = COLLAPSED_NESTED;
 	}
 
-	if (!is_silent && (suppress_collapsed == COLLAPSED_TERSE)) {
+	if (!is_silent && (tsd->suppress_collapsed == COLLAPSED_TERSE)) {
 		collapsed = COLLAPSED_NESTED;
 	}
 	else if (!is_silent) {
 //	else if (collapsed != COLLAPSED_NESTED) {
 
-		if (cfg.flow_below_cnt && !check_flow_below(symname, 1))
+		if (cfg.flow_below_cnt && !check_flow_below(symname, 1, tsd))
 			return -1;
 
 		if (lt_sh(&cfg, timestamp) || lt_sh(&cfg, counts))
@@ -173,16 +198,16 @@ static int sym_entry(const char *symname, void *ptr,
 			sym = lt_symbol_get(cfg.sh, ptr, symname);
 
 		if (sym && sym->collapsed) {
-			strncpy(suppress_while, sym->name, sizeof(suppress_while)-1);
-			suppress_while[sizeof(suppress_while)-1] = 0;
-			suppress_nested++;
+			strncpy(tsd->suppress_while, sym->name, sizeof(tsd->suppress_while)-1);
+			tsd->suppress_while[sizeof(tsd->suppress_while)-1] = 0;
+			tsd->suppress_nested++;
 			collapsed = sym->collapsed;
 			set_suppress_collapsed = 1;
 		}
 
 	#ifdef CONFIG_ARCH_HAVE_ARGS
 		argret = lt_sh(&cfg, args_enabled) ?
-			lt_args_sym_entry(cfg.sh, sym, regs, &argbuf, &argdbuf, is_silent) : -1;
+			lt_args_sym_entry(cfg.sh, sym, regs, argbuf, LR_ARGS_MAXLEN, &argdbuf, is_silent, tsd) : -1;
 	#endif
 	}
 
@@ -190,11 +215,19 @@ static int sym_entry(const char *symname, void *ptr,
 		char buf[FIFO_MSG_MAXLEN];
 		int len;
 
-		if (!pipe_fd)
-			pipe_fd = lt_fifo_create(&cfg, cfg.dir);
+		if (!tsd->pipe_fd)
+			tsd->pipe_fd = lt_fifo_create(&cfg, cfg.dir);
 
-		if (pipe_fd == -1)
+		if (tsd->pipe_fd == -1)
 			return -1;
+
+		if (tsd->excised) {
+			len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
+					"", lib_to, tsd->excised, argdbuf, collapsed);
+			lt_fifo_send(&cfg, tsd->pipe_fd, buf, len);
+			safe_free(tsd->excised);
+			tsd->excised = NULL;
+		}
 
 		len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
 				(char*) symname, lib_to, argbuf, argdbuf, collapsed);
@@ -202,50 +235,63 @@ static int sym_entry(const char *symname, void *ptr,
 		free_argbuf(argret, argbuf, argdbuf);
 
 		if (!is_silent && set_suppress_collapsed)
-			suppress_collapsed = collapsed;
+			tsd->suppress_collapsed = collapsed;
 
-		return lt_fifo_send(&cfg, pipe_fd, buf, len);
+		return lt_fifo_send(&cfg, tsd->pipe_fd, buf, len);
 	}
 
-	indent_depth++;
+	tsd->indent_depth++;
 
 	if (!is_silent && set_suppress_collapsed)
-		suppress_collapsed = collapsed;
+		tsd->suppress_collapsed = collapsed;
+
+	if (tsd->excised) {
+		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), tsd->indent_depth, collapsed,
+			"", lib_to, tsd->excised, argdbuf, &tsd->nsuppressed);
+		safe_free(tsd->excised);
+		tsd->excised = NULL;
+	}
 
 	/* If symname is empty then all we care about is preserving the call stack depth */
 	if (*symname) {
-		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), indent_depth, collapsed,
-			symname, lib_to, argbuf, argdbuf);
+		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), tsd->indent_depth, collapsed,
+			symname, lib_to, argbuf, argdbuf, &tsd->nsuppressed);
 	}
 
 	free_argbuf(argret, argbuf, argdbuf);
 	return 0;
 }
 
-static int sym_exit(const char *symname, void *ptr,
-			 char *lib_from, char *lib_to,
-			 const La_regs *inregs, La_retval *outregs)
+STATIC int sym_exit(const char *symname, void *ptr, char *lib_from, char *lib_to,
+			 const La_regs *inregs, La_retval *outregs, lt_tsd_t *tsd)
 {
 	int argret = -1;
-	char *argbuf = "", *argdbuf = "";
+	char *argbuf, *argdbuf = "";
 	struct timeval tv;
 	struct lt_symbol *sym = NULL;
 	int collapsed = 0, is_silent = 0;
 
+#ifdef USE_GLIBC_FEATURES
+	XMALLOC_ASSIGN(argbuf, LR_ARGS_MAXLEN);
+#else
+	argbuf = alloca(LR_ARGS_MAXLEN);
+#endif
+	memset(argbuf, 0, LR_ARGS_MAXLEN);
+
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
 
-	if (suppress_while[0]) {
-		if (!strcmp(suppress_while, symname)) {
-			suppress_nested--;
+	if (tsd->suppress_while[0]) {
+		if (!strcmp(tsd->suppress_while, symname)) {
+			tsd->suppress_nested--;
 
-			if (!suppress_nested) {
-				memset(suppress_while, 0, sizeof(suppress_while));
-				suppress_collapsed = 0;
+			if (!tsd->suppress_nested) {
+				memset(tsd->suppress_while, 0, sizeof(tsd->suppress_while));
+				tsd->suppress_collapsed = 0;
 			} else
 				is_silent = 1;
 
 		}
-		else if (suppress_nested > 0)
+		else if (tsd->suppress_nested > 0)
 			is_silent = 1;
 	}
 
@@ -255,14 +301,14 @@ static int sym_exit(const char *symname, void *ptr,
 
 		if (sym && sym->args->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
 		#ifdef CONFIG_ARCH_HAVE_ARGS
-			argret = lt_args_sym_exit(cfg.sh, sym, (La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent);
+			argret = lt_args_sym_exit(cfg.sh, sym, (La_regs*) inregs, outregs, argbuf, LR_ARGS_MAXLEN, &argdbuf, is_silent, tsd);
 		#endif
 		}
 
 		collapsed = COLLAPSED_NESTED;
 	} else {
 
-		if (cfg.flow_below_cnt && !check_flow_below(symname, 0))
+		if (cfg.flow_below_cnt && !check_flow_below(symname, 0, tsd))
 			return 0;
 
 		if (lt_sh(&cfg, timestamp) || lt_sh(&cfg, counts))
@@ -277,7 +323,7 @@ static int sym_exit(const char *symname, void *ptr,
 #ifdef CONFIG_ARCH_HAVE_ARGS
 		argret = lt_sh(&cfg, args_enabled) ?
 			lt_args_sym_exit(cfg.sh, sym,
-				(La_regs*) inregs, outregs, &argbuf, &argdbuf, is_silent) : -1;
+				(La_regs*) inregs, outregs, argbuf, LR_ARGS_MAXLEN, &argdbuf, is_silent, tsd) : -1;
 #endif
 	}
 
@@ -293,22 +339,22 @@ static int sym_exit(const char *symname, void *ptr,
 
 		free_argbuf(argret, argbuf, argdbuf);
 
-		return lt_fifo_send(&cfg, pipe_fd, buf, len);
+		return lt_fifo_send(&cfg, tsd->pipe_fd, buf, len);
 	}
 
 	lt_out_exit(cfg.sh, &tv, syscall(SYS_gettid),
-			indent_depth, collapsed,
+			tsd->indent_depth, collapsed,
 			symname, lib_from,
-			argbuf, argdbuf);
+			argbuf, argdbuf, &tsd->nsuppressed);
 
-	if (indent_depth)
-		indent_depth--;
+	if (tsd->indent_depth)
+		tsd->indent_depth--;
 
 	free_argbuf(argret, argbuf, argdbuf);
 	return 0;
 }
 
-static int check_pid()
+STATIC int check_pid()
 {
 	pid_t pid = getpid();
 
@@ -335,8 +381,8 @@ do { \
 } while(0)
 
 #ifdef TRANSFORMER_CRASH_PROTECTION
-	#define LA_ENTER(x)	jmp_set = x;
-	#define LA_RET(x)	{ jmp_set = 0; return x; }
+	#define LA_ENTER(x)	TSD_SET(jmp_set,x)
+	#define LA_RET(x)	{ TSD_SET(jmp_set,0); return x; }
 #else
 	#define LA_ENTER(x)	;
 	#define LA_RET(x)	return x;
@@ -344,16 +390,29 @@ do { \
 
 unsigned int la_version(unsigned int v)
 {
+	lt_tsd_t *tsd = NULL;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_version() in thread %ld\n", syscall(SYS_gettid));
+		return v;
+	}
+
 	LA_ENTER(CODE_LOC_LA_VERSION);
 	LA_RET(v)
 }
 
 unsigned int la_objopen(struct link_map *l, Lmid_t a, uintptr_t *cookie)
 {
+	lt_tsd_t *tsd = NULL;
 	symbol_mapping_t *pmap = NULL;
 	char *name = l->l_name;
 	size_t msize = 0;
 	int res;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_objopen() in thread %ld\n", syscall(SYS_gettid));
+		return 0;
+	}
 
 	LA_ENTER(CODE_LOC_LA_OBJOPEN);
 
@@ -389,7 +448,7 @@ unsigned int la_objopen(struct link_map *l, Lmid_t a, uintptr_t *cookie)
 	LA_RET(0);
 }
 
-static unsigned int la_symbind(ElfW(Sym) *sym, const char *symname)
+STATIC unsigned int la_symbind(ElfW(Sym) *sym, const char *symname, lt_tsd_t *tsd)
 {
 	unsigned int flags = 0;
 
@@ -415,7 +474,7 @@ static unsigned int la_symbind(ElfW(Sym) *sym, const char *symname)
 	}
 
 	/* we are interested in this symbol */
-	if (lt_sh(&cfg, global_symbols) &&
+	if (tsd && lt_sh(&cfg, global_symbols) &&
 	    !(flags & LA_SYMB_NOPLTENTER))
 		lt_symbol_bind(cfg.sh, (void*) sym->st_value, symname);
 
@@ -424,6 +483,13 @@ static unsigned int la_symbind(ElfW(Sym) *sym, const char *symname)
 
 void la_activity(uintptr_t *cookie, unsigned int act)
 {
+	lt_tsd_t *tsd = NULL;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_activity() in thread %ld\n", syscall(SYS_gettid));
+		return;
+	}
+
 	LA_ENTER(CODE_LOC_LA_ACTIVITY);
 	PRINT_VERBOSE(&cfg, 2, "%s\n", "entry");
 	LA_RET();
@@ -431,6 +497,13 @@ void la_activity(uintptr_t *cookie, unsigned int act)
 
 char* la_objsearch(const char *name, uintptr_t *cookie, unsigned int flag)
 {
+	lt_tsd_t *tsd = NULL;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_objsearch() in thread %ld\n", syscall(SYS_gettid));
+		return (char *)name;
+	}
+
 	LA_ENTER(CODE_LOC_LA_OBJSEARCH);
 
 	if (flag == LA_SER_ORIG)
@@ -441,6 +514,15 @@ char* la_objsearch(const char *name, uintptr_t *cookie, unsigned int flag)
 
 void la_preinit(uintptr_t *__cookie)
 {
+	lt_tsd_t *tsd = NULL;
+
+	glibc_unsafe = 1;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_preinit() in thread %ld\n", syscall(SYS_gettid));
+		return;
+	}
+
 	LA_ENTER(CODE_LOC_LA_PREINIT);
 	PRINT_VERBOSE(&cfg, 2, "%s\n", "entry");
 	LA_RET();
@@ -448,42 +530,262 @@ void la_preinit(uintptr_t *__cookie)
 
 unsigned int la_objclose(uintptr_t *__cookie)
 {
+	lt_tsd_t *tsd = NULL;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_objclose() in thread %ld\n", syscall(SYS_gettid));
+		return 0;
+	}
+
 	LA_ENTER(CODE_LOC_LA_OBJCLOSE);
 	PRINT_VERBOSE(&cfg, 2, "%s\n", "entry");
 	LA_RET(0);
 }
 
+
 #if __ELF_NATIVE_CLASS == 32
 uintptr_t la_symbind32(Elf32_Sym *sym, unsigned int ndx, uintptr_t *refcook,
 		uintptr_t *defcook, unsigned int *flags, const char *symname)
 {
+	lt_tsd_t *tsd = NULL;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_symbind32() in thread %ld\n", syscall(SYS_gettid));
+		*flags = la_symbind(sym, symname, tsd);
+		return sym->st_value;
+	}
+
 	LA_ENTER(CODE_LOC_LA_SYMBIND_NATIVE);
-	*flags = la_symbind(sym, symname);
+	*flags = la_symbind(sym, symname, tsd);
 	LA_RET(sym->st_value);
 }
 #elif __ELF_NATIVE_CLASS == 64
 uintptr_t la_symbind64(Elf64_Sym *sym, unsigned int ndx, uintptr_t *refcook,
 		uintptr_t *defcook, unsigned int *flags, const char *symname)
 {
+	lt_tsd_t *tsd = NULL;
+
+	if (!(tsd = thread_get_tsd(1))) {
+		PRINT_ERROR("Could not get TSD for la_symbind64() / %s in thread %ld\n", symname, syscall(SYS_gettid));
+		*flags = la_symbind(sym, symname, tsd);
+		return sym->st_value;
+	}
+
 	LA_ENTER(CODE_LOC_LA_SYMBIND_NATIVE);
-	*flags = la_symbind(sym, symname);
+	*flags = la_symbind(sym, symname, tsd);
 	LA_RET(sym->st_value);
 }
 #endif
+
+/*
+ * Tried consoldating this into one single array where:
+ * thread_data[MAXPTIDS] and void *data[MAXIDX]
+ * but this didn't work for some unknown reason. Should revisit.
+ */
+typedef struct lt_thread_pkey {
+	pid_t tid;
+	void *data;
+} lt_thread_pkey_t;
+
+static lt_thread_pkey_t thread_data[MAXIDX][MAXPTIDS];
+
+STATIC int
+SETSPECIFIC(pid_t tid, size_t idx, void *data, int *found) {
+	size_t t;
+
+	if (idx >= MAXIDX)
+		return -1;
+
+	pthread_mutex_lock(&tsd_lock);
+
+	for (t = 0; t < MAXPTIDS; t++) {
+
+		if ((thread_data[idx][t].tid == 0) || (thread_data[idx][t].tid == tid)) {
+			thread_data[idx][t].tid = tid;
+			thread_data[idx][t].data = data;
+			pthread_mutex_unlock(&tsd_lock);
+			return 0;
+		}
+
+	}
+
+	pthread_mutex_unlock(&tsd_lock);
+	return -1;
+//	return pthread_setspecific(lt_thread_pkey, data);
+}
+
+// XXX: probably doesn't require locking here
+STATIC void *
+GETSPECIFIC(pid_t tid, size_t idx, int *found) {
+	void *result = NULL;
+	size_t t;
+
+	if (found)
+		*found = 0;
+
+	if (idx >= MAXIDX)
+		return NULL;
+
+	pthread_mutex_lock(&tsd_lock);
+
+	for (t = 0; t < MAXPTIDS; t++) {
+
+		if (thread_data[idx][t].tid == tid) {
+			result = thread_data[idx][t].data;
+
+			if (found)
+				*found = 1;
+
+			break;
+		}
+
+	}
+
+	pthread_mutex_unlock(&tsd_lock);
+	return result;
+//	return pthread_getspecific(lt_thread_pkey);
+}
+
+STATIC
+int thread_tls_mark(pid_t tid, int set)
+{
+	int res = 0;
+	int found = 0;
+
+	if (set > 0) {
+		SETSPECIFIC(tid, PKEY_ID_MARK_TLS, (void *)1, &found);
+		return found;
+	} else if (set < 0) {
+		SETSPECIFIC(tid, PKEY_ID_MARK_TLS, (void *)0, &found);
+		return found;
+	}
+
+	res = (int)GETSPECIFIC(tid, PKEY_ID_MARK_TLS, &found);
+
+	if (!found)
+		return 0;
+
+	return res;
+}
+
+void
+setup_tsd_pkeys(void)
+{
+
+	if (lt_thread_pkey_init != 0)
+		return;
+
+	master_thread = syscall(SYS_gettid);
+
+	pthread_key_create(&lt_thread_pkey, NULL);
+	if (pthread_key_create(&lt_thread_pkey, NULL) != 0) {
+		PRINT_ERROR("Failed to create thread specific data: %s\n", strerror(errno));
+		lt_thread_pkey_init = -1;
+	} else if (pthread_key_create(&lt_tsd_pkey, NULL) != 0) {
+		PRINT_ERROR("Failed to create thread specific data[2]: %s\n", strerror(errno));
+		lt_thread_pkey_init = -1;
+	} else {
+//		pthread_setspecific(lt_thread_pkey, PKEY_VAL_INITIALIZED);
+#ifdef USE_GLIBC_FEATURES
+//		pthread_setspecific(lt_thread_pkey, (void *)(unsigned long)master_thread);
+#else
+		SETSPECIFIC(master_thread, PKEY_ID_THREAD_STATE, (void *)(unsigned long)master_thread, NULL);
+#endif
+		thread_get_tsd(2);
+		lt_thread_pkey_init = 1;
+	}
+
+	return;
+}
+
+lt_tsd_t *
+thread_get_tsd(int create)
+{
+	void *pkd;
+	int found;
+	unsigned long this_thread;
+
+	if (create == 1 && !lt_thread_pkey_init)
+		setup_tsd_pkeys();
+
+	if (lt_thread_pkey_init <= 0)
+		return NULL;
+
+#ifdef USE_GLIBC_FEATURES
+//	pkd = pthread_getspecific(lt_thread_pkey);
+	pkd = this_tsd;
+
+	if (!pkd && create) {
+		lt_tsd_t *tsd;
+
+		XMALLOC_ASSIGN(tsd, sizeof(lt_tsd_t));
+		memset(tsd, 0, sizeof(*tsd));
+		tsd->last_operation = -1;
+		this_tsd = pkd = tsd;
+//		pthread_setspecific(lt_thread_pkey, pkd);
+	}
+
+	return pkd;
+#endif
+
+	this_thread = syscall(SYS_gettid);
+
+	pkd = GETSPECIFIC(this_thread, PKEY_ID_THREAD_STATE, NULL);
+	found = (pkd == PKEY_VAL_INITIALIZED || pkd == PKEY_VAL_TLS_BAD ||
+		pkd == (void *)this_thread);
+
+	if (found && (pkd != PKEY_VAL_INITIALIZED) && pkd != (void *)this_thread)
+		return NULL;
+
+	if (!found && thread_tls_mark(syscall(SYS_gettid), 0) > 0)
+		return NULL;
+
+	pkd = GETSPECIFIC(this_thread, PKEY_ID_TSD, NULL);
+
+	if (!pkd && create) {
+		lt_tsd_t *tsd;
+
+		//XMALLOC_ASSIGN(tsd, sizeof(lt_tsd_t));
+		tsd = safe_malloc(4096);
+		memset(tsd, 0, sizeof(*tsd));
+		tsd->last_operation = -1;
+		pkd = tsd;
+		SETSPECIFIC(this_thread, PKEY_ID_TSD, pkd, NULL);
+	}
+
+	return (lt_tsd_t *)pkd;
+}
 
 ElfW(Addr)
 pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
           uintptr_t *defcook, La_regs *regs, unsigned int *flags,
           const char *symname, long int *framesizep)
 {
+	lt_tsd_t *tsd = NULL;
 	struct link_map *lr = (struct link_map*) *refcook;
 	struct link_map *ld = (struct link_map*) *defcook;
+	char *excised = NULL;
 	int ret = 0;
+	int tls_volatile = 0;
+	pid_t this_thread = syscall(SYS_gettid);
+
+	if (lt_thread_pkey_init < 0)
+		return sym->st_value;
+	else if (!lt_thread_pkey_init)
+		setup_tsd_pkeys();
+
+	tsd = thread_get_tsd(0);
+
+#ifdef USE_GLIBC_FEATURES
+	if (!tsd) {
+		PRINT_ERROR("Could not get TSD for pltenter() in thread %d\n", this_thread);
+		return sym->st_value;
+	}
 
 	LA_ENTER(CODE_LOC_LA_PLTENTER);
 #ifdef TRANSFORMER_CRASH_PROTECTION
-	last_symbol = symname;
-	last_operation = 0;
+	TSD_SET(last_symbol, symname);
+	TSD_SET(last_operation, 0);
 #endif
 
 	do {
@@ -494,15 +796,115 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 		ret = sym_entry(symname, (void*) sym->st_value,
 			  lr ? lr->l_name : NULL,
 			  ld ? ld->l_name : NULL,
-			  regs);
+			  regs, tsd);
 
 	} while(0);
 
 	if (ret < 0)
 		LA_RET(sym->st_value);
 
-	*framesizep = lt_stack_framesize(&cfg, regs);
+	*framesizep = lt_stack_framesize(&cfg, regs, tsd);
+	LA_RET(sym->st_value);
+#endif
 
+	if (!strcmp(symname, "__clone"))
+		__sync_add_and_fetch(&thread_warning, 1);
+	else if (!strcmp(symname, "__call_tls_dtors")) {
+		PRINT_ERROR("Program appears to be shutting down... skipping tracing of internal function %s() / TID %d\n", symname, this_thread);
+		thread_tls_mark(this_thread, 1);
+		return sym->st_value;
+	}
+
+	if (this_thread != master_thread) {
+		void *pkd = NULL;
+		int found = 0;
+
+		pkd = GETSPECIFIC(this_thread, PKEY_ID_THREAD_STATE, NULL);
+		found = (pkd == PKEY_VAL_INITIALIZED || pkd == PKEY_VAL_TLS_BAD ||
+			pkd == (void *)(unsigned long)this_thread);
+
+		if (!found && thread_tls_mark(this_thread, 0) > 0) {
+			int remove;
+
+			remove = (!lr || !(lr->l_name) || !(strstr(lr->l_name, "libpthread.so")));
+			tls_volatile = 1;
+
+			if (remove) {
+				excised = GETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL);
+				SETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL, NULL);
+				SETSPECIFIC(this_thread, PKEY_ID_THREAD_STATE, (void *)(unsigned long)this_thread, NULL);
+				thread_tls_mark(this_thread, -1);
+				tsd = thread_get_tsd(1);
+				tls_volatile = 0;
+			}
+
+		} else if (!found && (thread_warning > 0)) {
+			__sync_add_and_fetch(&thread_warning, -1);
+			thread_tls_mark(this_thread, 1);
+			SETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL, NULL);
+			tls_volatile = 1;
+		} else if (!found) {
+			SETSPECIFIC(this_thread, PKEY_ID_THREAD_STATE, PKEY_VAL_INITIALIZED, NULL);
+			SETSPECIFIC(this_thread, PKEY_ID_THREAD_STATE, (void *)(unsigned long)this_thread, NULL);
+			tsd = thread_get_tsd(1);
+		} else if (found && (pkd == PKEY_VAL_TLS_BAD)) {
+			tls_volatile = 1;
+		}
+
+	}
+
+	if (!tsd || tls_volatile) {
+		if (!tsd) {
+			size_t eleft, elen;
+			char *prefix = "";
+
+			excised = GETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL);
+
+			if (!excised) {
+				excised = safe_malloc(4096);
+				memset(excised, 0, 4096);
+			}
+
+			elen = strlen(excised);
+
+			if (elen)
+				prefix = "; ";
+
+			eleft = 4096 - elen;
+			snprintf(&excised[elen], eleft, "%s%s(): cannot track function with TLS in volatile state", prefix, symname);
+			SETSPECIFIC(this_thread, PKEY_ID_EXCISED, excised, NULL);
+		}
+
+		return sym->st_value;
+	}
+
+	LA_ENTER(CODE_LOC_LA_PLTENTER);
+#ifdef TRANSFORMER_CRASH_PROTECTION
+	TSD_SET(last_symbol, symname);
+	TSD_SET(last_operation, 0);
+#endif
+
+	if (excised)
+		tsd->excised = excised;
+
+	do {
+		CHECK_DISABLED(sym->st_value);
+
+		CHECK_PID(sym->st_value);
+
+		ret = sym_entry(symname, (void*) sym->st_value,
+			  lr ? lr->l_name : NULL,
+			  ld ? ld->l_name : NULL,
+			  regs, tsd);
+
+	} while(0);
+
+	if (ret < 0)
+		LA_RET(sym->st_value);
+
+	// XXX: Why does this fail otherwise??
+//	*framesizep = lt_stack_framesize(&cfg, regs, tsd);
+	*framesizep = 1000;
 	LA_RET(sym->st_value);
 }
 
@@ -510,13 +912,19 @@ unsigned int pltexit(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
          uintptr_t *defcook, const La_regs *inregs, La_retval *outregs,
          const char *symname)
 {
+	lt_tsd_t *tsd = NULL;
 	struct link_map *lr = (struct link_map*) *refcook;
 	struct link_map *ld = (struct link_map*) *defcook;
 
+	if (!(tsd = thread_get_tsd(0))) {
+		PRINT_ERROR("Could not get TSD for pltexit() in thread %ld\n", syscall(SYS_gettid));
+		return 0;
+	}
+
 	LA_ENTER(CODE_LOC_LA_PLTEXIT);
 #ifdef TRANSFORMER_CRASH_PROTECTION
-	last_symbol = symname;
-	last_operation = 1;
+	TSD_SET(last_symbol, symname);
+	TSD_SET(last_operation, 1);
 #endif
 
 	do {
@@ -525,7 +933,7 @@ unsigned int pltexit(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 		sym_exit(symname, (void*) sym->st_value,
 			 lr ? lr->l_name : NULL,
 			 ld ? ld->l_name : NULL,
-			 inregs, outregs);
+			 inregs, outregs, tsd);
 
 	} while(0);
 
@@ -534,89 +942,144 @@ unsigned int pltexit(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 
 #ifdef TRANSFORMER_CRASH_PROTECTION
 void
-inline crash_handler_internal(void)
+inline crash_handler_internal(int *do_exit)
 {
-	if (jmp_set) {
-		switch (jmp_set) {
+	lt_tsd_t *tsd = NULL;
+
+	if (do_exit)
+		*do_exit = 0;
+
+	tsd = thread_get_tsd(0);
+
+	if (TSD_GET(jmp_set,0)) {
+		switch (TSD_GET(jmp_set,0)) {
 			case CODE_LOC_LA_TRANSFORMER:
-				fault_reason = "internal transformer violation";
+				TSD_SET(fault_reason, "internal transformer violation");
 				break;
 			case CODE_LOC_LA_INTERCEPT:
-				fault_reason = "internal intercept violation";
+				TSD_SET(fault_reason, "internal intercept violation");
 				break;
 			case CODE_LOC_LA_VERSION:
-				fault_reason = "audit version hook";
+				TSD_SET(fault_reason, "audit version hook");
 				break;
 			case CODE_LOC_LA_OBJOPEN:
-				fault_reason = "audit object open hook";
+				TSD_SET(fault_reason, "audit object open hook");
 				break;
 			case CODE_LOC_LA_SYMBIND:
-				fault_reason = "audit symbol bind hook";
+				TSD_SET(fault_reason, "audit symbol bind hook");
 				break;
 			case CODE_LOC_LA_ACTIVITY:
-				fault_reason = "audit activity hook";
+				TSD_SET(fault_reason, "audit activity hook");
 				break;
 			case CODE_LOC_LA_OBJSEARCH:
-				fault_reason = "audit object search hook";
+				TSD_SET(fault_reason, "audit object search hook");
 				break;
 			case CODE_LOC_LA_PREINIT:
-				fault_reason = "audit pre initialization hook";
+				TSD_SET(fault_reason, "audit pre initialization hook");
 				break;
 			case CODE_LOC_LA_OBJCLOSE:
-				fault_reason = "audit object close hook";
+				TSD_SET(fault_reason, "audit object close hook");
 				break;
 			case CODE_LOC_LA_SYMBIND_NATIVE:
-				fault_reason = "audit symbolbind arch hook";
+				TSD_SET(fault_reason, "audit symbolbind arch hook");
 				break;
 			case CODE_LOC_LA_PLTENTER:
-				fault_reason = "audit PLT entry hook";
+				TSD_SET(fault_reason, "audit PLT entry hook");
 				break;
 			case CODE_LOC_LA_PLTEXIT:
-				fault_reason = "audit PLT exit hook";
+				TSD_SET(fault_reason, "audit PLT exit hook");
 				break;
 			default:
-				fault_reason = "unknown INTERNAL error";
+				TSD_SET(fault_reason, "unknown INTERNAL error");
 				break;
 		}
 		
-		if (jmp_set == CODE_LOC_LA_TRANSFORMER || jmp_set == CODE_LOC_LA_INTERCEPT)
-			longjmp(crash_insurance, 666);
+		if ((TSD_GET(jmp_set,0) == CODE_LOC_LA_TRANSFORMER) ||
+			(TSD_GET(jmp_set,0) == CODE_LOC_LA_INTERCEPT))
+			longjmp(TSD_GET(crash_insurance,NULL), 666);
 
 		PRINT_ERROR("Warning: signal appeared to be generated by internal latrace routine (%s).\n",
-			fault_reason);
+			TSD_GET(fault_reason,NULL));
 
-		if (last_operation >= 0)
-			PRINT_ERROR("Last known operation before crash: %s / %s\n", last_symbol,
-				(!last_operation ? "entry" : "exit"));
+		if (TSD_GET(last_operation,-1) >= 0)
+			PRINT_ERROR("Last known operation before crash: %s / %s\n", TSD_GET(last_symbol,NULL),
+				(!TSD_GET(last_operation,-1) ? "entry" : "exit"));
 
 		PRINT_ERROR("%s", "Exiting immediately.\n");
-		_exit(-1);
+
+		if (do_exit)
+			*do_exit = 1;
+		else
+			_exit(EXIT_FAILURE);
 	} else {
-		fault_reason = "unknown error";
+		TSD_SET(fault_reason, "unknown error");
 		PRINT_ERROR("%s", "Warning: signal appeared to be delivered outside of user custom code.\n");
 
-		if (last_operation >= 0)
-			PRINT_ERROR("Last known operation before crash: %s / %s\n", last_symbol,
-				(!last_operation ? "entry" : "exit"));
+		if (TSD_GET(last_operation,-1) >= 0)
+			PRINT_ERROR("Last known operation before crash: %s / %s\n", TSD_GET(last_symbol,NULL),
+				(!TSD_GET(last_operation,-1) ? "entry" : "exit"));
 
 		PRINT_ERROR("%s", "Exiting immediately.\n");
-		_exit(-1);
+
+		if (do_exit)
+			*do_exit = 1;
+		else
+			_exit(EXIT_FAILURE);
 	}
 
 	return;
 }
 
-#ifndef TRANSFORMER_CRASH_PROTECTION_ENHANCED
-static void crash_handler(int signo)
+
+void *address_map[] = { check_names, check_flow_below, free_argbuf, sym_entry, sym_exit,
+		check_pid, la_version, la_objopen, la_symbind, la_activity, la_objsearch,
+		la_preinit, la_objclose, la_symbind64, pltenter, pltexit,
+		lt_stack_process, lt_stack_process_ret };
+
+// XXX: Is there really any value to this?
+STATIC void triangulate_pc(unsigned long pc)
 {
-	PRINT_ERROR("Warning: caught potentially fatal signal: %d\n", signo);
-	crash_handler_internal();
+	char tmpbuf[128], tmpbuf2[128], tmpbuf3[128];
+	size_t i, before = 0, after = 0;
+	size_t bdist = ~(0), adist = ~(0);
+
+	for (i = 0; i < sizeof(address_map)/sizeof(address_map[0]); i++) {
+
+		if (((unsigned long)address_map[i] >= pc) &&
+			((unsigned long)address_map[i] - pc) < adist) {
+			adist = (unsigned long)address_map[i] - pc;
+			after = i;
+		}
+
+		if (((unsigned long)address_map[i] <= pc) &&
+			(pc - (unsigned long)address_map[i]) < bdist) {
+			bdist = pc - (unsigned long)address_map[i];
+			before = i;
+		}
+	}
+
+	PRINT_ERROR("SANDWICH: %p [%s] <-> %p [%s] <-> %p [%s]\n",
+		address_map[before], resolve_sym(address_map[before], 0, tmpbuf, sizeof(tmpbuf), NULL),
+		(void *)pc, resolve_sym((void *)pc, 0, tmpbuf2, sizeof(tmpbuf2), NULL),
+		address_map[after], resolve_sym(address_map[after], 0, tmpbuf3, sizeof(tmpbuf3), NULL));
+}
+
+#ifndef TRANSFORMER_CRASH_PROTECTION_ENHANCED
+STATIC
+void crash_handler(int signo)
+{
+	PRINT_ERROR("Warning: caught potentially fatal signal: %d / %ld\n", signo, syscall(SYS_gettid));
+	crash_handler_internal(NULL);
 }
 #else
-static void
+STATIC
+void
 crash_handler_si(int signo, siginfo_t *si, void *ucontext)
 {
+	mcontext_t mcontext;
 	const char *more_info = "additional information unavailable";
+	unsigned long pc, *fp;
+	static int gdb_once = 0;
 
 	if (signo == SIGSEGV) {
 		if (si->si_code == SEGV_MAPERR)
@@ -627,14 +1090,88 @@ crash_handler_si(int signo, siginfo_t *si, void *ucontext)
 			more_info = "unknown SIGSEGV violation subtype";
 	}
 
-	PRINT_ERROR("Warning: caught potentially fatal signal: %d (code = %d (%s), addr = %p)\n",
-		signo, si->si_code, more_info, si->si_addr);
-	crash_handler_internal();
+#define PREG(r)	(unsigned long)mcontext.gregs[r]
+
+	mcontext = ((ucontext_t *)ucontext)->uc_mcontext;
+	pc = mcontext.gregs[REG_RIP];
+	fp = (unsigned long *)mcontext.gregs[REG_RBP];
+	PRINT_ERROR("Warning: caught potentially fatal signal: %d (code = %d (%s), addr = %p) / thread %ld; pc=0x%lx\n",
+		signo, si->si_code, more_info, si->si_addr, syscall(SYS_gettid), pc);
+	PRINT_ERROR("Warning: register dump[ rax = 0x%lx, rbx = 0x%lx, rcx = 0x%lx, rdx = 0x%lx ]\n",
+		PREG(REG_RAX), PREG(REG_RBX), PREG(REG_RCX), PREG(REG_RDX));
+	PRINT_ERROR("Warning: register dump[ rdi = 0x%lx, rsi = 0x%lx, rbp = 0x%lx, rsp = 0x%lx ]\n",
+		PREG(REG_RDI), PREG(REG_RSI), PREG(REG_RBP), PREG(REG_RSP));
+	PRINT_ERROR("Warning: register dump[ r8 = 0x%lx, r9 = 0x%lx, r10 = 0x%lx, r11 = 0x%lx ]\n",
+		PREG(REG_R8), PREG(REG_R9), PREG(REG_R10), PREG(REG_R11));
+	PRINT_ERROR("Warning: register dump[ r12 = 0x%lx, r13 = 0x%lx, r14 = 0x%lx, r15 = 0x%lx ]\n",
+		PREG(REG_R12), PREG(REG_R13), PREG(REG_R14), PREG(REG_R15));
+
+	unsigned char *pcb = (unsigned char *)pc;
+	PRINT_ERROR("Warning: bytes at instruction pointer: %.2x %.2x %.2x %.2x\n", pcb[0], pcb[1], pcb[2], pcb[3]);
+	triangulate_pc(pc);
+
+	size_t level = 0;
+	int do_exit = 0;
+
+	while (pc && fp) {
+		char tmpbuf[128];
+		const char *fname = NULL;
+
+		resolve_sym((void *)pc, 0, tmpbuf, sizeof(tmpbuf), &fname);
+		PRINT_ERROR("BACKTRACE / %zu %p <%s> (%s)\n", level++, (void *)pc, tmpbuf, fname);
+		pc = fp[1];
+		fp = (unsigned long *)fp[0];
+
+		if (pc && !fp) {
+			resolve_sym((void *)pc, 0, tmpbuf, sizeof(tmpbuf), &fname);
+			PRINT_ERROR("BACKTRACE FINAL (possibly spurious?)/ %zu %p <%s> (%s)\n", level++, (void *)pc, tmpbuf, fname);
+		}
+	}
+
+	if (gdb_once)
+		PRINT_ERROR("%s", "GDB already seems to be launched... skipping prompt.\n");
+/*	else {
+		size_t sleep_val = 2;
+		char tid_buf[16];
+
+		gdb_once = 1;
+		PRINT_ERROR("Type anything to spawn GDB (%d / %ld).\n", getpid(), syscall(SYS_gettid));
+		getchar();
+		snprintf(tid_buf, sizeof(tid_buf), "%ld", syscall(SYS_gettid));
+		PRINT_ERROR("Launching GDB and sleeping for %zu seconds...\n", sleep_val);
+
+		switch(fork()) {
+			case -1:
+				PRINT_ERROR("Could not fork to launch gdb: %s\n", strerror(errno));
+				break;
+			case 0:
+				{
+					unsetenv("LIBLDAUDIT_PATH");
+					unsetenv("LD_AUDIT");
+					execl("/usr/bin/gdb", "/usr/bin/gdb", "attach", tid_buf, NULL);
+					perror("execl");
+					_exit(-1);
+				}
+				break;
+			default:
+				sleep(sleep_val);
+				setcontext(ucontext);
+				PRINT_ERROR("Error calling setcontext: %s\n", strerror(errno));
+				break;
+		}
+
+	} */
+
+	crash_handler_internal(&do_exit);
+
+	if (do_exit)
+		_exit(EXIT_FAILURE);
 }
 #endif
 #endif
 
-int setup_crash_handlers(void)
+int
+setup_crash_handlers(void)
 {
 #ifdef TRANSFORMER_CRASH_PROTECTION
 	struct sigaction sa;

@@ -24,27 +24,9 @@
 #include <stdlib.h>
 
 
-typedef struct function_call {
-	char *fn_name;
-	La_regs registers;
-	void **args;
-	size_t argcnt;
-} fn_call_t;
-
-static __thread int ass_integer;
-static __thread int ass_sse;
-static __thread int ass_memory;
-static __thread fn_call_t *xfm_call_stack = NULL;
-static __thread size_t xfm_call_stack_max = 0, xfm_call_stack_sz = 0;
-extern __thread char *fault_reason;
-#ifdef TRANSFORMER_CRASH_PROTECTION
-extern __thread jmp_buf crash_insurance;
-extern __thread int jmp_set;
-#endif
-
 #define ASS_CLEANUP() \
 do { \
-	ass_integer = ass_sse = ass_memory = 0; \
+	tsd->ass_integer = tsd->ass_sse = tsd->ass_memory = 0; \
 } while(0)
 
 /* INTEGER registers used for function arguments. */
@@ -85,78 +67,82 @@ static long ass_regs_sse[] = {
 #define ASS_REGS_SSE_RET_CNT  (2)
 
 static int classificate_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
-				int ret, int align);
+				int ret, int align, lt_tsd_t *tsd);
 
-static int classificate_memory(struct lt_config_shared *cfg, 
-			struct lt_arg *arg, int align)
+STATIC int classificate_memory(struct lt_config_shared *cfg,
+			struct lt_arg *arg, int align, lt_tsd_t *tsd)
 {
+
 	if (align)
-		ass_memory = LT_STACK_ALIGN(ass_memory);
+		tsd->ass_memory = LT_STACK_ALIGN(tsd->ass_memory);
 	else {
-		int naligned = ass_memory % arg->type_len;
+		int naligned = tsd->ass_memory % arg->type_len;
 
 		if (naligned)
-			ass_memory += arg->type_len - naligned;
+			tsd->ass_memory += arg->type_len - naligned;
 	}
 
 	PRINT_VERBOSE(cfg, 2, "%s - ass %d\n",
-			arg->name, ass_memory);
+			arg->name, tsd->ass_memory);
 
-	ARCH_SET(arg, ARCH_FLAG_MEM, ass_memory);
+	ARCH_SET(arg, ARCH_FLAG_MEM, tsd->ass_memory);
 
 	if (arg->pointer)
-		ass_memory += sizeof(void*);
+		tsd->ass_memory += sizeof(void*);
 	else
-		ass_memory += arg->type_len;
+		tsd->ass_memory += arg->type_len;
 		
 	return 0;
 }
 
-static int classificate_integer(struct lt_config_shared *cfg,
-			struct lt_arg *arg, int align, int regs_size)
+STATIC int classificate_integer(struct lt_config_shared *cfg,
+			struct lt_arg *arg, int align, int regs_size,
+			lt_tsd_t *tsd)
 {
+
 	if (!align) {
-		int ass = LT_STACK_ALIGN(ass_integer);
-		int naligned = ass_integer % arg->type_len;
+		int ass = LT_STACK_ALIGN(tsd->ass_integer);
+		int naligned = tsd->ass_integer % arg->type_len;
 
 		if (naligned)
-			ass_integer += arg->type_len - naligned;
+			tsd->ass_integer += arg->type_len - naligned;
 
-		if ((ass_integer + arg->type_len) > ass)
-			ass_integer = LT_STACK_ALIGN(ass_integer);
+		if ((tsd->ass_integer + arg->type_len) > ass)
+			tsd->ass_integer = LT_STACK_ALIGN(tsd->ass_integer);
 	}
 
 	PRINT_VERBOSE(cfg, 2,
 			"ass %s - reg size %d - ass_integer %d\n", 
-			arg->name, regs_size, ass_integer);
+			arg->name, regs_size, tsd->ass_integer);
 
-	if (ass_integer >= regs_size)
+	if (tsd->ass_integer >= regs_size)
 		return -1;
 
-	ARCH_SET(arg, ARCH_FLAG_REG_INTEGER, ass_integer);
+	ARCH_SET(arg, ARCH_FLAG_REG_INTEGER, tsd->ass_integer);
 
 	if (arg->pointer)
-		ass_integer += sizeof(void*);
+		tsd->ass_integer += sizeof(void*);
 	else
-		ass_integer += align ? sizeof(void*) : arg->type_len;
+		tsd->ass_integer += align ? sizeof(void*) : arg->type_len;
 
 	return 0;
 }
 
-static int classificate_sse(struct lt_config_shared *cfg, struct lt_arg *arg,
-				int sse_cnt)
+STATIC int classificate_sse(struct lt_config_shared *cfg, struct lt_arg *arg,
+				int sse_cnt, lt_tsd_t *tsd)
 {
-	PRINT_VERBOSE(cfg, 2, "ass %s %d %d\n",
-			arg->name, ASS_REGS_SSE_CNT, ass_sse);
 
-	if (sse_cnt == ass_sse)
+	PRINT_VERBOSE(cfg, 2, "ass %s %d %d\n",
+			arg->name, ASS_REGS_SSE_CNT, tsd->ass_sse);
+
+	if (sse_cnt == tsd->ass_sse)
 		return -1;
 
-	ARCH_SET(arg, ARCH_FLAG_REG_SSE, ass_sse++);
+	ARCH_SET(arg, ARCH_FLAG_REG_SSE, tsd->ass_sse++);
 	return 0;
 }
 
-static void struct_arch(struct lt_config_shared *cfg, struct lt_arg *sarg,
+STATIC void struct_arch(struct lt_config_shared *cfg, struct lt_arg *sarg,
 			struct lt_arg *farg)
 {
 	if (sarg->pointer)
@@ -177,29 +163,30 @@ static void struct_arch(struct lt_config_shared *cfg, struct lt_arg *sarg,
 }
 
 
-static int classificate_struct_try(struct lt_config_shared *cfg, 
-			struct lt_arg *arg, int allmem, int ret)
+STATIC int classificate_struct_try(struct lt_config_shared *cfg,
+			struct lt_arg *arg, int allmem, int ret,
+			lt_tsd_t *tsd)
 {
 	struct lt_arg *a;
 	int first = 1;
-	int saved_ass_integer = ass_integer;
-	int saved_ass_sse     = ass_sse;
-	int saved_ass_memory  = ass_memory;
+	int saved_ass_integer = tsd->ass_integer;
+	int saved_ass_sse     = tsd->ass_sse;
+	int saved_ass_memory  = tsd->ass_memory;
 
 	lt_list_for_each_entry(a, arg->args_head, args_list) {
 
 		if (allmem)
-			classificate_memory(cfg, a, first);
+			classificate_memory(cfg, a, first, tsd);
 		else {
-			if (-1 == classificate_arg(cfg, a, ret, 0))
+			if (-1 == classificate_arg(cfg, a, ret, 0, tsd))
 				return -1;
 
 			if (ARCH_GET_FLAG(arg) == ARCH_FLAG_MEM) {
 				/* There is not enough registers, reset to 
 				   have the structure in memory only. */
-				ass_integer = saved_ass_integer;
-				ass_sse     = saved_ass_sse;
-				ass_memory  = saved_ass_memory;
+				tsd->ass_integer = saved_ass_integer;
+				tsd->ass_sse     = saved_ass_sse;
+				tsd->ass_memory  = saved_ass_memory;
 				return -1;
 			}
 
@@ -214,7 +201,7 @@ static int classificate_struct_try(struct lt_config_shared *cfg,
 	return 0;
 }
 
-static int get_sizeof(struct lt_config_shared *cfg, struct lt_arg *arg)
+STATIC int get_sizeof(struct lt_config_shared *cfg, struct lt_arg *arg)
 {
 	struct lt_arg *a;
 	int size = 0;
@@ -235,8 +222,8 @@ static int get_sizeof(struct lt_config_shared *cfg, struct lt_arg *arg)
 	return size;
 }
 
-static int classificate_struct(struct lt_config_shared *cfg, struct lt_arg *arg,
-				int ret)
+STATIC int classificate_struct(struct lt_config_shared *cfg, struct lt_arg *arg,
+				int ret, lt_tsd_t *tsd)
 {
 	int allmem = 0;
 	int size = get_sizeof(cfg, arg);
@@ -252,13 +239,13 @@ static int classificate_struct(struct lt_config_shared *cfg, struct lt_arg *arg,
 		"struct %s - length sum %d - allmem %d\n", 
 		arg->type_name, arg->type_len, allmem);
 
-	if (-1 == classificate_struct_try(cfg, arg, allmem, ret))
-		classificate_struct_try(cfg, arg, 1, ret);
+	if (-1 == classificate_struct_try(cfg, arg, allmem, ret, tsd))
+		classificate_struct_try(cfg, arg, 1, ret, tsd);
 
 	return 0;
 }
 
-static int classificate_arg_type(struct lt_config_shared *cfg, 
+STATIC int classificate_arg_type(struct lt_config_shared *cfg,
 				struct lt_arg *arg)
 {
 	int class;
@@ -304,8 +291,8 @@ static int classificate_arg_type(struct lt_config_shared *cfg,
 	return class;
 }
 
-static int classificate_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
-				int ret, int align)
+STATIC int classificate_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
+				int ret, int align, lt_tsd_t *tsd)
 {
 	int class;
 	int class_failed = 0;
@@ -317,7 +304,7 @@ static int classificate_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 
 	if (arg->dtype != LT_ARGS_DTYPE_POD) {
 
-		if (-1 == classificate_struct(cfg, arg, ret))
+		if (-1 == classificate_struct(cfg, arg, ret, tsd))
 			return -1;
 
 		/* If the structure is passed by pointer, we 
@@ -337,30 +324,30 @@ static int classificate_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 	switch(class) {
 	case LT_CLASS_SSE:
 		class_failed = classificate_sse(cfg, arg, 
-				ret ? ASS_REGS_SSE_RET_CNT : 
-				      ASS_REGS_SSE_CNT);
+				(ret ? ASS_REGS_SSE_RET_CNT :
+				      ASS_REGS_SSE_CNT), tsd);
 		break;
 			
 	case LT_CLASS_INTEGER:
 		class_failed = classificate_integer(cfg, arg, align,
-				ret ? ASS_REGS_INTEGER_RET_SIZE : 
-				      ASS_REGS_INTEGER_SIZE);
+				(ret ? ASS_REGS_INTEGER_RET_SIZE :
+				      ASS_REGS_INTEGER_SIZE), tsd);
 		break;
 
 	case LT_CLASS_MEMORY:
-		classificate_memory(cfg, arg, 1);
+		classificate_memory(cfg, arg, 1, tsd);
 		break;
 	}
 
 	/* If class INTEGER or SSE ran out of registers, 
 	   then arg is in memory. */
 	if (class_failed)
-		classificate_memory(cfg, arg, 1);
+		classificate_memory(cfg, arg, 1, tsd);
 
 	return 0;
 }
 
-static int classificate(struct lt_config_shared *cfg, struct lt_args_sym *sym)
+STATIC int classificate(struct lt_config_shared *cfg, struct lt_args_sym *sym, lt_tsd_t *tsd)
 {
 	int i;
 	struct lt_arg *arg = sym->args[LT_ARGS_RET];
@@ -371,7 +358,7 @@ static int classificate(struct lt_config_shared *cfg, struct lt_args_sym *sym)
 	ASS_CLEANUP();
 
 	/* Classificate the return value first. */
-	if (-1 == classificate_arg(cfg, arg, 1, 1))
+	if (-1 == classificate_arg(cfg, arg, 1, 1, tsd))
 		return -1;
 
 	ASS_CLEANUP();
@@ -379,19 +366,19 @@ static int classificate(struct lt_config_shared *cfg, struct lt_args_sym *sym)
 	/* If the return value is memory class, 
 	   then the edi register is used as a first hidden arg.*/
 	if (ARCH_GET_FLAG(arg) == ARCH_FLAG_MEM)
-		ass_integer += 8;
+		tsd->ass_integer += 8;
 
 	for(i = 1; i < sym->argcnt; i++) {
 		arg = sym->args[i];
 
-		if (-1 == classificate_arg(cfg, arg, 0, 1))
+		if (-1 == classificate_arg(cfg, arg, 0, 1, tsd))
 			return -1;
 	}
 
 	return 0;
 }
 
-static void *get_value_mem(struct lt_config_shared *cfg, struct lt_arg *arg, 
+STATIC void *get_value_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
 			void *regs, int ret)
 {
 	long offset = ARCH_GET_OFFSET(arg);
@@ -412,7 +399,7 @@ static void *get_value_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
 	return pval;
 }
 
-static void *get_value_reg_integer(struct lt_config_shared *cfg,
+STATIC void *get_value_reg_integer(struct lt_config_shared *cfg,
 			struct lt_arg *arg, void *regs, int ret)
 {
 	struct La_x86_64_retval *regs_ret = regs;
@@ -459,7 +446,7 @@ static void *get_value_reg_integer(struct lt_config_shared *cfg,
 	return pval;
 }
 
-static void *get_value_reg_sse(struct lt_config_shared *cfg,
+STATIC void *get_value_reg_sse(struct lt_config_shared *cfg,
 			struct lt_arg *arg, void *regs, int ret)
 {
 	int i = ARCH_GET_OFFSET(arg);
@@ -488,7 +475,7 @@ static void *get_value_reg_sse(struct lt_config_shared *cfg,
 	return pval;
 }
 
-static void* get_value(struct lt_config_shared *cfg, struct lt_arg *arg,
+STATIC void* get_value(struct lt_config_shared *cfg, struct lt_arg *arg,
 			void *regs, int ret)
 {
 	void *pval = NULL;
@@ -515,7 +502,7 @@ static void* get_value(struct lt_config_shared *cfg, struct lt_arg *arg,
 
 /* Process structure stored completelly in the 
    memory - pointed to by 'pval' arg. */
-static int process_struct_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
+STATIC int process_struct_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
 				void *pval, struct lt_args_data *data)
 {
 	struct lt_arg *a;
@@ -538,7 +525,7 @@ static int process_struct_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
 	return 0;
 }
 
-static int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
+STATIC int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 			void *regs, struct lt_args_data *data, int ret)
 {
 	struct lt_arg *a;
@@ -562,7 +549,7 @@ static int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 	return 0;
 }
 
-static void process_detailed_struct(struct lt_config_shared *cfg, 
+STATIC void process_detailed_struct(struct lt_config_shared *cfg,
 		struct lt_arg *arg, void *pval, struct lt_args_data *data, 
 		void *regs, int ret)
 {
@@ -579,54 +566,67 @@ static void process_detailed_struct(struct lt_config_shared *cfg,
 	}
 }
 
-static void
-enter_transformer_callstack(char *symname, La_regs *inregs, void **args, size_t argcnt)
+STATIC void
+enter_transformer_callstack(char *symname, La_regs *inregs, void **args, size_t argcnt, lt_tsd_t *tsd)
 {
 
-	if (!xfm_call_stack_max)
+	if (!tsd->xfm_call_stack_max)
 	{
-		xfm_call_stack_max = 4;
-		xfm_call_stack_sz = 0;
-		xfm_call_stack = malloc(sizeof(*xfm_call_stack) * xfm_call_stack_max);
-	} else if (xfm_call_stack_sz == xfm_call_stack_max) {
-		xfm_call_stack_max *= 2;
-		xfm_call_stack = realloc(xfm_call_stack, sizeof(*xfm_call_stack) * xfm_call_stack_max);
+		tsd->xfm_call_stack_max = 8;
+		tsd->xfm_call_stack_sz = 0;
+#ifdef USE_GLIBC_FEATURES
+		XMALLOC_ASSIGN(tsd->xfm_call_stack, (sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max));
+#else
+		tsd->xfm_call_stack = mmap(NULL, (sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max),
+			PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0);
+#endif
+	} else if (tsd->xfm_call_stack_sz == tsd->xfm_call_stack_max) {
+		size_t old_size, new_size;
+
+		old_size = sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max;
+		tsd->xfm_call_stack_max *= 2;
+		new_size = sizeof(*tsd->xfm_call_stack) * tsd->xfm_call_stack_max;
+#ifdef USE_GLIBC_FEATURES
+		XREALLOC_ASSIGN(tsd->xfm_call_stack, tsd->xfm_call_stack, new_size);
+#else
+		tsd->xfm_call_stack = mremap(tsd->xfm_call_stack, old_size, new_size, MREMAP_MAYMOVE);
+#endif
 	}
 
-	xfm_call_stack[xfm_call_stack_sz].fn_name = symname;
-	xfm_call_stack[xfm_call_stack_sz].args = args;
-	xfm_call_stack[xfm_call_stack_sz].argcnt = argcnt;
-	memcpy(&xfm_call_stack[xfm_call_stack_sz].registers, inregs, sizeof(*inregs));
-	xfm_call_stack_sz++;
+	tsd->xfm_call_stack[tsd->xfm_call_stack_sz].fn_name = symname;
+	tsd->xfm_call_stack[tsd->xfm_call_stack_sz].args = args;
+	tsd->xfm_call_stack[tsd->xfm_call_stack_sz].argcnt = argcnt;
+	memcpy(&tsd->xfm_call_stack[tsd->xfm_call_stack_sz].registers, inregs, sizeof(*inregs));
+	tsd->xfm_call_stack_sz++;
 
 	return;
 }
 
-static int
-exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t *pargcnt)
+STATIC int
+exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t *pargcnt, lt_tsd_t *tsd)
 {
 	int i;
 
-	if (!xfm_call_stack_max || !xfm_call_stack_sz) {
-		PRINT_ERROR("%s", "Whoops: could not find entry on transformer call stack.\n");
+	if (!tsd->xfm_call_stack_max || !tsd->xfm_call_stack_sz) {
+		PRINT_ERROR_SAFE("%s", "Whoops: could not find entry on transformer call stack.\n");
 		return -1;
 	}
 
-	for (i = xfm_call_stack_sz; i > 0; i--) {
+	for (i = tsd->xfm_call_stack_sz; i > 0; i--) {
 
-		if (strcmp(xfm_call_stack[i-1].fn_name, symname))
+		if (strcmp(tsd->xfm_call_stack[i-1].fn_name, symname))
 			continue;
 
-		if (memcmp(&(xfm_call_stack[i-1].registers), inregs, sizeof(*inregs)))
+		if (memcmp(&(tsd->xfm_call_stack[i-1].registers), inregs, sizeof(*inregs)))
 			continue;
 
-		*pargs = xfm_call_stack[i-1].args;
-		*pargcnt = xfm_call_stack[i-1].argcnt;
+		*pargs = tsd->xfm_call_stack[i-1].args;
+		*pargcnt = tsd->xfm_call_stack[i-1].argcnt;
 
-		memcpy(&(xfm_call_stack[i-1]), &(xfm_call_stack[i]),
-			(sizeof(fn_call_t) * (xfm_call_stack_sz - i)));
+		memcpy(&(tsd->xfm_call_stack[i-1]), &(tsd->xfm_call_stack[i]),
+			(sizeof(fn_call_t) * (tsd->xfm_call_stack_sz - i)));
 
-		xfm_call_stack_sz--;
+		tsd->xfm_call_stack_sz--;
 		return 0;
 	}
 
@@ -634,15 +634,16 @@ exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t
 }
 
 #ifdef TRANSFORMER_CRASH_PROTECTION
-	#define CRASH_PROLOGUE(x)	 jmp_set = (sigsetjmp(crash_insurance, 1) == 0) ? x : 0;
-	#define CRASH_EPILOGUE(x)	 jmp_set = 0;
+	#define CRASH_PROLOGUE(x)	 do { if (tsd) { tsd->jmp_set = (sigsetjmp(tsd->crash_insurance, 1) == 0) ? x : 0; } } while (0)
+	#define CRASH_EPILOGUE(x)	 TSD_SET(jmp_set,0)
 #else
 	#define CRASH_PROLOGUE(x)	;
 	#define CRASH_EPILOGUE(x)	;
 #endif
 
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-			La_regs *regs, struct lt_args_data *data, int silent)
+			La_regs *regs, struct lt_args_data *data, int silent,
+			lt_tsd_t *tsd)
 {
 	int i;
 
@@ -652,10 +653,13 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		int tres = -1;
 
 		if (!ARCH_GET(asym->args[LT_ARGS_RET]) &&
-		    (-1 == classificate(cfg, asym)))
+		    (-1 == classificate(cfg, asym, tsd)))
 			return -1;
-
-		targs = malloc(sizeof(void *) * asym->argcnt);
+#ifdef USE_GLIBC_FEATURES
+		XMALLOC_ASSIGN(targs, (sizeof(void *) * asym->argcnt));
+#else
+		targs = safe_malloc(4096);
+#endif
 
 		for(i = 1; i < asym->argcnt; i++) {
 			void *pval = NULL;
@@ -667,10 +671,10 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 		if (asym->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
 			CRASH_PROLOGUE(CODE_LOC_LA_INTERCEPT);
-			if (fault_reason) {
+			if (tsd->fault_reason) {
 				PRINT_ERROR("Error: caught fatal condition in custom func intercept entry for %s: %s\n",
-					asym->name, fault_reason);
-				fault_reason = NULL;
+					asym->name, tsd->fault_reason);
+				tsd->fault_reason = NULL;
 			} else
 				asym->args[LT_ARGS_RET]->latrace_custom_func_intercept(targs, asym->argcnt-1, NULL);
 
@@ -680,10 +684,10 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		if (!silent && asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
-			if (fault_reason) {
+			if (tsd->fault_reason) {
 				PRINT_ERROR("Error: caught fatal condition in custom func transformer entry for %s: %s\n",
-					asym->name, fault_reason);
-				fault_reason = NULL;
+					asym->name, tsd->fault_reason);
+				tsd->fault_reason = NULL;
 			} else {
 				tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(targs,
 					asym->argcnt-1, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, NULL);
@@ -693,11 +697,11 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		}
 
 /*		if (silent) {
-			free(targs);
+			XFREE(targs);
 			return 0;
 		} */
 
-		enter_transformer_callstack(asym->name, regs, targs, asym->argcnt-1);
+		enter_transformer_callstack(asym->name, regs, targs, asym->argcnt-1, tsd);
 
 		if (silent)
 			return 0;
@@ -710,7 +714,7 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 	}
 
 	if (!ARCH_GET(asym->args[LT_ARGS_RET]) &&
-	    (-1 == classificate(cfg, asym)))
+	    (-1 == classificate(cfg, asym, tsd)))
 		return -1;
 
 	if (asym->argcnt == 1) {
@@ -753,10 +757,10 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
-			if (fault_reason) {
+			if (tsd->fault_reason) {
 				fprintf(stderr, "Error: caught fatal condition in custom func transformer entry for %s: %s\n",
-					asym->name, fault_reason);
-				fault_reason = NULL;
+					asym->name, tsd->fault_reason);
+				tsd->fault_reason = NULL;
 				CRASH_EPILOGUE();
 			} else {
 				result = arg->latrace_custom_struct_transformer(pvald, data->args_buf+data->args_totlen, left);
@@ -810,7 +814,8 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 }
 
 int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
-			La_regs *iregs, La_retval *regs, struct lt_args_data *data, int silent)
+			La_regs *iregs, La_retval *regs, struct lt_args_data *data, int silent,
+			lt_tsd_t *tsd)
 {
 	struct lt_arg *arg;
 	void *pval;
@@ -827,9 +832,9 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		size_t inargs_size = 0;
 		int tres = -1;
 
-//		if (!silent && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
-		if (needs_callstack && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size) < 0) {
-			PRINT_ERROR("%s", "Error retrieving function entry arguments from transformer call stack\n");
+//		if (!silent && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size, tsd) < 0) {
+		if (needs_callstack && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size, tsd) < 0) {
+			PRINT_ERROR_SAFE("%s", "Error retrieving function entry arguments from transformer call stack\n");
 			inargs = NULL;
 			inargs_size = 0;
 		}
@@ -840,10 +845,10 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		if (asym->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
 			CRASH_PROLOGUE(CODE_LOC_LA_INTERCEPT);
 
-			if (fault_reason) {
+			if (tsd->fault_reason) {
 				fprintf(stderr, "Error: caught fatal condition in custom func intercept exit for %s: %s\n",
-					asym->name, fault_reason);
-				fault_reason = NULL;
+					asym->name, tsd->fault_reason);
+				tsd->fault_reason = NULL;
 			} else
 				asym->args[LT_ARGS_RET]->latrace_custom_func_intercept(inargs, inargs_size, retval);
 
@@ -853,10 +858,10 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		if (!silent && asym->args[LT_ARGS_RET]->latrace_custom_func_transformer) {
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
-			if (fault_reason) {
+			if (tsd->fault_reason) {
 				fprintf(stderr, "Error: caught fatal condition in custom func transformer exit for %s: %s\n",
-					asym->name, fault_reason);
-				fault_reason = NULL;
+					asym->name, tsd->fault_reason);
+				tsd->fault_reason = NULL;
 			} else {
 				tres = asym->args[LT_ARGS_RET]->latrace_custom_func_transformer(inargs,
 					inargs_size, data->args_buf+data->args_totlen, data->args_len-data->args_totlen, retval);
@@ -869,10 +874,10 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			(!asym->args[LT_ARGS_RET]->fmt || !*(asym->args[LT_ARGS_RET]->fmt))) {
 			CRASH_PROLOGUE(CODE_LOC_LA_TRANSFORMER);
 
-			if (fault_reason) {
+			if (tsd->fault_reason) {
 				fprintf(stderr, "Error: caught fatal condition in custom struct transformer exit for %s: %s\n",
-					asym->name, fault_reason);
-				fault_reason = NULL;
+					asym->name, tsd->fault_reason);
+				tsd->fault_reason = NULL;
 			} else {
 				tres = asym->args[LT_ARGS_RET]->latrace_custom_struct_transformer(*((void**) pval), data->args_buf+data->args_totlen, data->args_len-data->args_totlen);
 			}
@@ -881,7 +886,7 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		}
 
 		if (inargs)
-			free(inargs);
+			XFREE(inargs);
 
 		if (silent)
 			return 0;

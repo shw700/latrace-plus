@@ -16,3 +16,9 @@ char*		inet_ntop(int __af, void *__cp, char *__buf, socklen_t __len);
 int 		inet_aton(char *__cp, struct in_addr *__inp);
 char*		inet_neta(in_addr_t __net, char *__buf, size_t __len);
 char*		inet_net_ntop(int __af, void *__cp, int __bits, char *__buf, size_t __len);
+
+uint32_t htonl~/x(uint32_t hostlong/x);
+uint16_t htons~(uint16_t hostshort);
+uint32_t ntohl~/x(uint32_t netlong/x);
+uint16_t ntohs~(uint16_t netshort);
+

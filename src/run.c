@@ -143,7 +143,8 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 				symname,
 				msym->data + msym->lib,
 				msym->data + msym->arg,
-				msym->data + msym->argd);
+				msym->data + msym->argd,
+				&t->nsuppressed);
 
 	} else if (FIFO_MSG_TYPE_EXIT == msym->h.type) {
 
@@ -153,7 +154,8 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 					msym->data + msym->sym,
 					msym->data + msym->lib,
 					msym->data + msym->arg,
-					msym->data + msym->argd);
+					msym->data + msym->argd,
+					&t->nsuppressed);
 		}
 
 		if (t->indent_depth)
@@ -418,7 +420,7 @@ static int run_in_gdb(const char *program, char * const *args, int start_exec)
 //	i = 0; while (environ[i]) { printf("ENV: %s\n", environ[i]); i++; }
 
 	ret = execvp(new_args[0], new_args);
-	free(new_args);
+	XFREE(new_args);
 
 	return ret;
 }

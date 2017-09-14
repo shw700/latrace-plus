@@ -107,7 +107,7 @@ struct lt_symbol* lt_symbol_bind(struct lt_config_shared *cfg,
 	}
 
 	if (!sym) {
-		sym = malloc(sizeof(*sym));
+		XMALLOC_ASSIGN(sym, sizeof(*sym));
 		if (!sym)
 			return NULL;
 	}

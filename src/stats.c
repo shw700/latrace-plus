@@ -32,6 +32,7 @@
 struct timeval tv_program_start;
 struct timeval tv_program_stop;
 
+
 int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 {
 	int i;
@@ -42,11 +43,10 @@ int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 			return -1;
 		}
 
-		t->sym_array = (struct lt_stats_sym**) malloc(
-				t->sym_max * sizeof(struct lt_stats_sym*));
+		XMALLOC_ASSIGN(t->sym_array, t->sym_max * sizeof(struct lt_stats_sym*));
 
 		if (!t->sym_array) {
-			perror("malloc failed");
+			perror("xmalloc failed");
 			return -1;
 		}
 
@@ -68,8 +68,7 @@ int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 		return -1;
 	}
 
-	t->sym_array = (struct lt_stats_sym**) realloc(t->sym_array, 
-			t->sym_max * sizeof(struct lt_stats_sym*));
+	XREALLOC_ASSIGN(t->sym_array, t->sym_array, (t->sym_max * sizeof(struct lt_stats_sym*)));
 
 	if (!t->sym_array) {
 		perror("realloc failed");
@@ -110,7 +109,7 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 	int realloc = 0;
 
 	sprintf(buf, "%s%s", m->data + m->sym, m->data + m->lib);
-	e.key = strdup(buf);
+	XSTRDUP_ASSIGN(e.key, buf);
 	e.data = 0;
 
 	/* array got out of space */
@@ -131,14 +130,14 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 	}
 
 	if (!ep->data) {
-		sym = malloc(sizeof(struct lt_stats_sym));
+		XMALLOC_ASSIGN(sym, sizeof(struct lt_stats_sym));
 		memset(sym, 0, sizeof(struct lt_stats_sym));
 
 		ep->data = sym;
 
 		sym->name = e.key;
-		sym->sym = strdup(m->data + m->sym);
-		sym->lib = strdup(m->data + m->lib);
+		XSTRDUP_ASSIGN(sym->sym, (m->data + m->sym));
+		XSTRDUP_ASSIGN(sym->lib, (m->data + m->lib));
 
 		t->sym_array[t->sym_cnt] = sym;
 		t->sym_cnt++;
@@ -146,7 +145,7 @@ int lt_stats_sym(struct lt_config_app *cfg, struct lt_thread *t,
 		PRINT_VERBOSE(cfg, 1,
 			"adding symbol %d %s\n", t->sym_cnt, sym->name);
 	} else
-		free(e.key);
+		XFREE(e.key);
 
 	sym = ep->data;
 	if (FIFO_MSG_TYPE_ENTRY == m->h.type) {

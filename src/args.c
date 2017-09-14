@@ -357,7 +357,7 @@ struct lt_bm_enum* getbmenum(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
-static struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
+STATIC struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
 {
 	struct lt_bm_enum *en;
 	ENTRY e, *ep;
@@ -384,7 +384,7 @@ static struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
 }
 
 char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt) {
-	char lbuf[1024];
+	char lbuf[1024], *result;
 	unsigned long left = val;
 	struct lt_bm_enum* bm_enum;
 	struct lt_enum* _enum = NULL;
@@ -476,10 +476,11 @@ left:
 	if (!val && !lbuf[0])
 		lbuf[0] = '0';
 
-	return (strdup(lbuf));
+	XSTRDUP_ASSIGN(result, lbuf);
+	return result;
 } 
 
-static int enum_comp(const void *ep1, const void *ep2)
+STATIC int enum_comp(const void *ep1, const void *ep2)
 {
 	struct lt_enum_elem *e1 = (struct lt_enum_elem*) ep1;
 	struct lt_enum_elem *e2 = (struct lt_enum_elem*) ep2;
@@ -487,7 +488,7 @@ static int enum_comp(const void *ep1, const void *ep2)
 	return e1->val - e2->val;
 }
 
-static int bm_enum_comp(const void *ep1, const void *ep2)
+STATIC int bm_enum_comp(const void *ep1, const void *ep2)
 {
 	struct lt_bm_enum_elem *e1 = (struct lt_bm_enum_elem*) ep1;
 	struct lt_bm_enum_elem *e2 = (struct lt_bm_enum_elem*) ep2;
@@ -495,7 +496,7 @@ static int bm_enum_comp(const void *ep1, const void *ep2)
 	return e1->val - e2->val;
 }
 
-static struct lt_enum_elem* get_enumelem(struct lt_config_shared *cfg, 
+STATIC struct lt_enum_elem* get_enumelem(struct lt_config_shared *cfg,
 	long val, struct lt_enum *en)
 {
 	struct lt_enum_elem key;
@@ -508,7 +509,7 @@ static struct lt_enum_elem* get_enumelem(struct lt_config_shared *cfg,
 		sizeof(struct lt_enum_elem), enum_comp);
 }
 
-static struct lt_enum_elem* find_enumelem(struct lt_config_shared *cfg,
+STATIC struct lt_enum_elem* find_enumelem(struct lt_config_shared *cfg,
 	char *name, struct lt_enum *en)
 {
 	struct lt_enum_elem *elem;
@@ -532,7 +533,8 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	struct lt_enum *en;
 	int i = 0, reverted = 0;
 
-	if (NULL == (en = malloc(sizeof(*en))))
+	XMALLOC_ASSIGN(en, sizeof(*en));
+	if (!en)
 		return -1;
 
 	memset(en, 0x0, sizeof(*en));
@@ -543,7 +545,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	if (!enum_init) {
 	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_enum_tab)) {
 	                perror("failed to create hash table:");
-			free(en);
+			XFREE(en);
 	                return -1;
 	        }
 		enum_init = 1;
@@ -554,7 +556,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 
 	if (!hsearch_r(e, ENTER, &ep, &args_enum_tab)) {
 		perror("hsearch_r failed");
-		free(en);
+		XFREE(en);
 		return 1;
 	}
 
@@ -564,7 +566,8 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	lt_list_for_each_entry(elem, h, list)
 		en->cnt++;
 
-	if (NULL == (en->elems = malloc(sizeof(struct lt_enum_elem) * en->cnt)))
+	XMALLOC_ASSIGN(en->elems, sizeof(struct lt_enum_elem) * en->cnt);
+	if (!en->elems)
 		return -1;
 
 	PRINT_VERBOSE(cfg, 3, "enum %s (%d elems) not fixed\n",
@@ -668,7 +671,8 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	struct lt_bm_enum *en;
 	int i = 0;
 
-	if (NULL == (en = malloc(sizeof(*en))))
+	XMALLOC_ASSIGN(en, sizeof(*en));
+	if (!en)
 		return -1;
 
 	memset(en, 0x0, sizeof(*en));
@@ -678,7 +682,7 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	if (!bm_enum_init) {
 	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_bm_enum_tab)) {
 	                perror("failed to create hash table:");
-			free(en);
+			XFREE(en);
 	                return -1;
 	        }
 		bm_enum_init = 1;
@@ -690,7 +694,7 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 
 	if (!hsearch_r(e, ENTER, &ep, &args_bm_enum_tab)) {
 		perror("hsearch_r failed");
-		free(en);
+		XFREE(en);
 		return 1;
 	}
 
@@ -700,7 +704,8 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	lt_list_for_each_entry(elem, h, list)
 		en->cnt++;
 
-	if (NULL == (en->elems = malloc(sizeof(struct lt_bm_enum_elem) * en->cnt)))
+	XMALLOC_ASSIGN(en->elems, sizeof(struct lt_bm_enum_elem) * en->cnt);
+	if (!en->elems)
 		return -1;
 
 	PRINT_VERBOSE(cfg, 3, "bm_enum %s (%d elems) not fixed\n",
@@ -731,7 +736,8 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 	struct lt_enum_elem* elem;
 	int base = 10;
 
-	if (NULL == (elem = malloc(sizeof(*elem))))
+	XMALLOC_ASSIGN(elem, sizeof(*elem));
+	if (!elem)
 		return NULL;
 
 	memset(elem, 0x0, sizeof(*elem));
@@ -747,7 +753,7 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 		/* parse errors */
 		if ((errno == ERANGE && (num == LONG_MAX || num == LONG_MIN)) || 
 		    (errno != 0 && num == 0)) {
-			free(elem);
+			XFREE(elem);
 			return NULL;
 		}
 
@@ -767,13 +773,13 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 		} else {
 			/* if no digits were found, we assume the
 			 * value is set by string reference */
-			elem->strval = strdup(val);
+			XSTRDUP_ASSIGN(elem->strval, val);
 		}
 
 	}
 
 	elem->base = base;
-	elem->name = strdup(name);
+	XSTRDUP_ASSIGN(elem->name, name);
 
 	PRINT_VERBOSE(cfg, 3, "enum elem %s = %d, strval %s, undef = %d\n",
 			elem->name, elem->val, elem->strval, elem->undef);
@@ -785,7 +791,8 @@ struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg,
 {
 	struct lt_bm_enum_elem* elem;
 
-	if (NULL == (elem = malloc(sizeof(*elem))))
+	XMALLOC_ASSIGN(elem, sizeof(*elem));
+	if (!elem)
 		return NULL;
 
 	memset(elem, 0x0, sizeof(*elem));
@@ -800,7 +807,7 @@ struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg,
 		/* parse errors */
 		if ((errno == ERANGE && (num == LONG_MAX || num == LONG_MIN)) || 
 		    (errno != 0 && num == 0)) {
-			free(elem);
+			XFREE(elem);
 			return NULL;
 		}
 
@@ -810,7 +817,7 @@ struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg,
 
 	}
 
-	elem->name = strdup(name);
+	XSTRDUP_ASSIGN(elem->name, name);
 
 	PRINT_VERBOSE(cfg, 3, "bm_enum elem %s = %d\n", elem->name, elem->val);
 	return elem;
@@ -840,8 +847,9 @@ int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 
 	/* empty struct pass-through */
 	if (!h) {
-		if (!(h = (struct lt_list_head*) malloc(sizeof(*h)))) {
-			perror("malloc failed");
+		XMALLOC_ASSIGN(h, sizeof(*h));
+		if (!h) {
+			perror("xmalloc failed");
 			return -1;
 		}
 
@@ -879,7 +887,8 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 	PRINT_VERBOSE(cfg, 3, "got symbol '%s %s'\n",
 			ret->type_name, ret->name);
 
-	if (NULL == (sym = (struct lt_args_sym*) malloc(sizeof(*sym))))
+	XMALLOC_ASSIGN(sym, sizeof(*sym));
+	if (!sym)
 		return -1;
 
 	memset(sym, 0, sizeof(*sym));
@@ -890,7 +899,7 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 	lt_list_for_each_entry(arg, h, args_list)
 		sym->argcnt++;
 
-	sym->args = (struct lt_arg**) malloc(sym->argcnt * sizeof(struct lt_arg**));
+	XMALLOC_ASSIGN(sym->args, (sym->argcnt * sizeof(struct lt_arg**)));
 	if (!sym->args)
 		/* no need to fre sym, since we are going
 		   to exit the program anyway */
@@ -910,8 +919,8 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 			char nbuf[32];
 
 			snprintf(nbuf, sizeof(nbuf), "%s%zu", ANON_PREFIX, argno);
-			free(arg->name);
-			arg->name = strdup(nbuf);
+			XFREE(arg->name);
+			XSTRDUP_ASSIGN(arg->name, nbuf);
 		}
 
 	}
@@ -921,7 +930,7 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 
 	if (!hsearch_r(e, ENTER, &ep, &cfg->args_tab)) {
 		perror("hsearch_r failed");
-		free(sym);
+		XFREE(sym);
 		/* we dont want to exit just because 
 		   we ran out of our symbol limit */
 		PRINT_VERBOSE(cfg, 3, "reach the symbol number limit %u\n",
@@ -933,7 +942,7 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 	return 0;
 }
 
-static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
+STATIC struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 {
 	struct lt_arg *arg, *a;
         struct lt_list_head *h;
@@ -941,8 +950,9 @@ static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 	PRINT_VERBOSE(cfg, 2, "got arg '%s %s', dtype %d\n",
 			asrc->type_name, asrc->name, asrc->dtype);
 
-	if (NULL == (arg = malloc(sizeof(*arg)))) {
-		perror("malloc failed");
+	XMALLOC_ASSIGN(arg, sizeof(*arg));
+	if (!arg) {
+		perror("xmalloc failed");
 		return NULL;
 	}
 
@@ -952,10 +962,10 @@ static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 		return arg;
 
 	/* For structures we need also to copy all its arguments. */
-
-        if (NULL == (h = (struct lt_list_head*) malloc(sizeof(*h)))) {
-		perror("malloc failed");
-		free(arg);
+	XMALLOC_ASSIGN(h, sizeof(*h));
+	if (!h) {
+		perror("xmalloc failed");
+		XFREE(arg);
 		return NULL;
 	}
                 
@@ -967,8 +977,8 @@ static struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 		/* XXX Not sure how safe is this one... 
 		   might need some attention in future :) */
 		if (NULL == (aa = argdup(cfg, a))) {
-			free(h);
-			free(arg);
+			XFREE(h);
+			XFREE(arg);
 			return NULL;
 		}
 
@@ -1043,7 +1053,7 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		modifier = NULL;
 
 	if (bitmask || fmt || modifier) {
-		name_copy = strdup(name);
+		XSTRDUP_ASSIGN(name_copy, name);
 		bitmask = strchr(name_copy, '|');
 		fmt = strchr(name_copy, '/');
 
@@ -1134,7 +1144,7 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		fmt = arg->en->fmt;
 	}
 
-	arg->name    = strdup(name);
+	XSTRDUP_ASSIGN(arg->name, name);
 
 	/* If the type is already a pointer (could be for typedef), 
 	   give it a chance to show up. There's only one pointer for 
@@ -1143,16 +1153,16 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		arg->pointer = pointer;
 
 	if (fmt && *fmt)
-		arg->fmt = strdup(fmt);
+		XSTRDUP_ASSIGN(arg->fmt, fmt);
 
 	if (bitmask)
-		arg->bitmask_class = strdup(bitmask);
+		XSTRDUP_ASSIGN(arg->bitmask_class, bitmask);
 
 	if (collapsed)
 		arg->collapsed = collapsed;
 
 	if (name_copy)
-		free(name_copy);
+		XFREE(name_copy);
 
 	return arg;
 }
@@ -1190,7 +1200,7 @@ int lt_args_add_typedef(struct lt_config_shared *cfg, const char *base,
 	args_def_typedef[i = args_def_typedef_cnt++] = *arg;
 
 	arg = &args_def_typedef[i];
-	arg->type_name = strdup(new);
+	XSTRDUP_ASSIGN(arg->type_name, new);
 	arg->pointer = pointer;
 
 	lt_init_list_head(&arg->args_list);
@@ -1210,7 +1220,7 @@ int lt_args_init(struct lt_config_shared *cfg)
 		if (env_dir) {
 			size_t fsize = strlen(env_dir) + 16;
 
-			file = malloc(fsize);
+			XMALLOC_ASSIGN(file, fsize);
 			memset(file, 0, fsize);
 			snprintf(file, fsize, "%s/latrace.h", env_dir);
 		} else
@@ -1252,7 +1262,7 @@ int lt_args_init(struct lt_config_shared *cfg)
 	return 0;
 }
 
-static int getstr_addenum(struct lt_config_shared *cfg, struct lt_arg *arg,
+STATIC int getstr_addenum(struct lt_config_shared *cfg, struct lt_arg *arg,
 			char *argbuf, int alen, long val)
 {
 	char *enstr = NULL;
@@ -1270,17 +1280,29 @@ static int getstr_addenum(struct lt_config_shared *cfg, struct lt_arg *arg,
 	return 0;
 }
 
-static char *massage_string(const char *s)
+STATIC char *massage_string(const char *s)
 {
 	char *result;
 	size_t rlen, slen, i, d_i;
 
 	slen = strlen(s);
-	rlen = (slen * 2) + 1;
-	result = malloc(rlen);
+	rlen = (slen * 2) + 6;
+
+#ifdef USE_GLIBC_FEATURES
+	XMALLOC_ASSIGN(result, rlen);
+#else
+	rlen = 4096;
+	result = safe_malloc(rlen);
+#endif
 	memset(result, 0, rlen);
 
 	for (i = 0, d_i = 0; i < slen; i++) {
+
+		if ((rlen - 6) <= d_i) {
+			strcat(result, "...");
+			break;
+		}
+
 		if ((s[i] != '\n') && (s[i] != '\r'))
 			result[d_i++] = s[i];
 		else {
@@ -1300,7 +1322,7 @@ static char *massage_string(const char *s)
 	return result;
 }
 
-static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *arg, 
+STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *arg,
 				void *pval, char *argbuf, int *arglen)
 {
 	int len = 0, alen = *arglen;
@@ -1321,6 +1343,7 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 		goto out;
 	} else if (arg->type_id == LT_ARGS_TYPEID_FNPTR) {
 		void *fn = *((void **) pval);
+		char addrbuf[128];
 		const char *fname;
 		const char *dname1, *dname2;
 
@@ -1331,6 +1354,8 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 			len = snprintf(argbuf, alen, "%s%sfn@ NULL", dname1, dname2);
 		else if ((fname = lookup_addr(fn)))
 			len = snprintf(argbuf, alen, "%s%sfn@ %s()", dname1, dname2, fname);
+		else if (resolve_sym(fn, 1, addrbuf, sizeof(addrbuf), NULL))
+			len = snprintf(argbuf, alen, "%s%sfn@ %s()", dname1, dname2, addrbuf);
 		else
 			len = snprintf(argbuf, alen, "%s%sfn@ %p", dname1, dname2, fn);
 
@@ -1368,9 +1393,20 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 		if (!len) {
 			if (ptr) {
 				const char *aname = NULL;
+				char abuf[128];
 				size_t off = 0;
 
-				if (cfg->resolve_syms && (aname = get_address_mapping(ptr, &off))) {
+				if (cfg->resolve_syms) {
+					aname = get_address_mapping(ptr, &off);
+
+					if (!aname) {
+						aname = resolve_sym(ptr, 0, abuf, sizeof(abuf), NULL);
+						off = 0;
+					}
+
+				}
+
+				if (cfg->resolve_syms && aname) {
 					const char *fmt_on = "", *fmt_off = "";
 					int demangled = 0;
 
@@ -1388,7 +1424,7 @@ static int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 						len = snprintf(argbuf, alen, "%s%s%s", fmt_on, aname, fmt_off);
 
 					if (demangled)
-						free((char *)aname);
+						XFREE((char *)aname);
 
 				} else
 					len = snprintf(argbuf, alen, "%p", ptr);
@@ -1449,7 +1485,7 @@ do {                                                                 \
 			if (!(max = atoi(widths)))
 				max = DEFAULT_BINARY_WIDTH;
 
-			free(widths);
+			XFREE(widths);
 		}
 
 		strcat(argbuf, "\"");
@@ -1504,8 +1540,11 @@ do {                                                                 \
 						strcat(argbuf, s);
 						strcat(argbuf, "\"");
 					}
-
-					free(s);
+#ifdef USE_GLIBC_FEATURES
+					XFREE(s);
+#else
+					safe_free(s);
+#endif
 				} else
 					len = snprintf(argbuf, alen, "NULL");
 			} else {
@@ -1606,23 +1645,18 @@ int lt_args_cb_struct(struct lt_config_shared *cfg, int type, struct lt_arg *arg
 	return 0;
 }
 
-static int getargs(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-		La_regs *regs, char **abuf, char **adbuf, int silent)
+STATIC int getargs(struct lt_config_shared *cfg, struct lt_args_sym *asym,
+		La_regs *regs, char *abuf, size_t argblen, char **adbuf, int silent, lt_tsd_t *tsd)
 {
 	struct lt_args_data data;
 	int arglen;
-	char *buf, *bufd;
-
-	if (NULL == (buf = malloc(cfg->args_maxlen)))
-		return -1;
+	char *bufd;
 
 	memset(&data, 0, sizeof(data));
 
-	*buf  = 0;
-	*abuf = buf;
-
 	if (cfg->args_detailed) {
-		if (NULL == (bufd = malloc(cfg->args_detail_maxlen)))
+		XMALLOC_ASSIGN(bufd, cfg->args_detail_maxlen);
+		if (!bufd)
 			return -1;
 
 		*bufd  = 0;
@@ -1631,19 +1665,18 @@ static int getargs(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		data.argsd_len = cfg->args_detail_maxlen;
 	}
 
-
 	/* makeup the final space for each 
 	   argument textual representation  */
-	arglen = (cfg->args_maxlen 
+	arglen = (argblen
 		- ((asym->argcnt - 1) * 2)  /* args separating commas */
 		 )/ asym->argcnt;
 
 
 	data.arglen   = arglen;
-	data.args_buf = buf;
-	data.args_len = cfg->args_maxlen;
+	data.args_buf = abuf;
+	data.args_len = argblen;
 
-	return lt_stack_process(cfg, asym, regs, &data, silent);
+	return lt_stack_process(cfg, asym, regs, &data, silent, tsd);
 }
 
 struct lt_args_sym* lt_args_sym_get(struct lt_config_shared *cfg,
@@ -1667,35 +1700,31 @@ struct lt_args_sym* lt_args_sym_get(struct lt_config_shared *cfg,
 }
 
 int lt_args_sym_entry(struct lt_config_shared *cfg, struct lt_symbol *sym,
-			La_regs *regs, char **argbuf, char **argdbuf, int silent)
+			La_regs *regs, char *argbuf, size_t argblen,
+			char **argdbuf, int silent, lt_tsd_t *tsd)
 {
 	struct lt_args_sym *asym = sym ? sym->args : NULL;
 
 	if (!asym)
 		return -1;
 
-	return getargs(cfg, asym, regs, argbuf, argdbuf, silent);
+	return getargs(cfg, asym, regs, argbuf, argblen, argdbuf, silent, tsd);
 }
 
-static int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym, 
-		La_regs *iregs, La_retval *regs, char **abuf, char **adbuf, int silent)
+STATIC int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
+		La_regs *iregs, La_retval *regs, char *abuf, size_t argblen,
+		char **adbuf, int silent, lt_tsd_t *tsd)
 {
 	struct lt_args_data data;
 	int arglen, totlen;
-	char *buf, *bufd;
-
-	if (NULL == (buf = malloc(cfg->args_maxlen)))
-		return -1;
+	char *bufd;
 
 	memset(&data, 0, sizeof(data));
 
-	*buf  = 0;
-	*abuf = buf;
-
 	/* TODO get together with getargs function somehow... */
 	if (cfg->args_detailed) {
-
-		if (NULL == (bufd = malloc(cfg->args_detail_maxlen)))
+		XMALLOC_ASSIGN(bufd, cfg->args_detail_maxlen);
+		if (!bufd)
 			return -1;
 
 		*bufd  = 0;
@@ -1704,26 +1733,27 @@ static int getargs_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 		data.argsd_len = cfg->args_detail_maxlen;
 	}
 
-	arglen = cfg->args_maxlen - sizeof(LT_EQUAL);
+	arglen = argblen - sizeof(LT_EQUAL);
 	totlen = sizeof(LT_EQUAL) - 1;
-	strcat(buf, LT_EQUAL);
+	strcat(abuf, LT_EQUAL);
 
 	data.arglen      = arglen;
-	data.args_buf    = buf;
-	data.args_len    = cfg->args_maxlen;
+	data.args_buf    = abuf;
+	data.args_len    = argblen;
 	data.args_totlen = totlen;
 
-	return lt_stack_process_ret(cfg, asym, iregs, regs, &data, silent);
+	return lt_stack_process_ret(cfg, asym, iregs, regs, &data, silent, tsd);
 }
 
 int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 			La_regs *inregs, La_retval *outregs,
-			char **argbuf, char **argdbuf, int silent)
+			char *argbuf, size_t argblen, char **argdbuf, int silent,
+			lt_tsd_t *tsd)
 {
 	struct lt_args_sym *asym = sym ? sym->args : NULL;
 
 	if (!asym)
 		return -1;
 
-	return getargs_ret(cfg, asym, inregs, outregs, argbuf, argdbuf, silent);
+	return getargs_ret(cfg, asym, inregs, outregs, argbuf, argblen, argdbuf, silent, tsd);
 }

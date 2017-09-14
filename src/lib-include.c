@@ -123,7 +123,7 @@ int lt_inc_open(struct lt_config_shared *cfg, struct lt_include *inc,
 	memset(inc_stack, 0, sizeof(*inc_stack));
 
 	inc_stack->in     = f;
-	inc_stack->file   = strdup(file);
+	XSTRDUP_ASSIGN(inc_stack->file, file);
 	inc_stack->lineno = 1;
 	inc_stack->buf    = inc->create_buffer(f, YY_BUF_SIZE);
 
@@ -141,7 +141,7 @@ int lt_inc_close(struct lt_config_shared *cfg, struct lt_include *inc)
 	PRINT_VERBOSE(cfg, 1, "buffer closed [%s], depth [%d]\n",
 			inc_stack->file, inc->stack_idx);
 
-	free(inc_stack->file);
+	XFREE(inc_stack->file);
 
 	/* EOF with no other includes on stack */
 	if (!inc->stack_idx)

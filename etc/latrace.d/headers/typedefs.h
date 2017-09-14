@@ -7,6 +7,11 @@ typedef int int32_t;
 typedef u_int uint32_t;
 typedef uint32_t in_addr_t;
 
+typedef unsigned short uint16_t;
+
+typedef long int int64_t;
+typedef unsigned long uint64_t;
+
 typedef int socklen_t;
 typedef unsigned int size_t;
 

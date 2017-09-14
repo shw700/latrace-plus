@@ -40,11 +40,23 @@ wctype_t __wctype_l~(const char *property, __locale_t locale);
 pfn __nss_lookup_function~(void *nip, char *fnname);
 int _nss_files_parse_pwent~(char *line, struct passwd *result, struct parser_data *data, size_t datalen, int *errnop);
 
+/* pthread internal */
 int __pthread_key_create~(pthread_key_t *key, pfn *destr);
 void *__pthread_getspecific~(pthread_key_t key);
+int __pthread_setspecific~(pthread_key_t key, const void *value);
 int __pthread_mutex_lock~(pthread_mutex_t *__mutex);
 int __pthread_mutex_unlock~(pthread_mutex_t *__mutex);
+int __pthread_once^(pthread_once_t *once_control, pfn init_routine);
 int *__libc_pthread_init~(unsigned long *ptr, pfn reclaim, const struct pthread_functions *functions);
+
+/* glibc/ld.so */
+void *_dl_allocate_tls~(void *mem);
+void *_dl_sym~(void *handle, const char *name, void *who);
+struct link_map *_dl_find_dso_for_object~(void *addr);
+void **__libc_dl_error_tsd~(void);
+void _dl_get_tls_static_info~(size_t *sizep, size_t *alignp);
+int __clone(pfn fn, void *__child_stack, int __flags, void *__arg, ...);
+int __clone2(pfn fn, void *__child_stack_base, size_t __child_stack_size, int __flags, void *__arg, ...);
 
 typedef unsigned long ptrdiff_t;
 void* __dynamic_cast~(const void* __src_ptr, const __class_type_info* __src_type, const __class_type_info* __dst_type, ptrdiff_t __src2dst);
@@ -64,11 +76,13 @@ int __ns_name_ntop~(const u_char *src, char *dst/p, size_t dstsiz);
 int is_selinux_enabled~(void);
 int is_selinux_mls_enabled~(void);
 
+/* proc */
 PROCTAB* openproc!(int flags/x, ...);
 void closeproc~(PROCTAB* PT);
 proc_t* readproc!(PROCTAB *PT, proc_t *return_buf);
 
 
+/* editline */
 enum el_op {
 	EL_PROMPT     = 0,
 	EL_TERMINAL   = 1,
@@ -93,8 +107,6 @@ enum el_op {
 	EL_REFRESH    = 20
 };
 
-
-/* eidtline */
 EditLine *el_init(const char *prog, FILE *fin, FILE *fout, FILE *ferr);
 int el_get!(EditLine *e, int op=el_op, ...);
 int el_set!(EditLine *e, int op=el_op, ...);
@@ -103,7 +115,6 @@ int el_source~(EditLine *e, const char *file);
 int el_getc~(EditLine *e, char *ch/p);
 void el_reset~(EditLine *e);
 void el_end~(EditLine *e);
-
 
 History *history_init~(void);
 int history~(History *h, HistEvent *ev, int op, ...);

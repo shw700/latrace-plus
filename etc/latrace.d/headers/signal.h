@@ -70,7 +70,7 @@ void*   bsd_signal(int sig = SIGNALS, void *handler = SIGNAL_HANDLER);
 
 int     kill(__pid_t pid, int sig = SIGNALS);
 int     killpg(__pid_t pgrp, int sig = SIGNALS);
-int     raise(int sig = SIGNALS);
+int     raise~(int sig = SIGNALS);
 
 
 void*   ssignal(int sig = SIGNALS, void *handler = SIGNAL_HANDLER);
