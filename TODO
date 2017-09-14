@@ -24,6 +24,7 @@ bugs
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- * ridiculous unknown bug handling __longjmp_chk()
+	- everything should still compile fine without libunwind present
 
 Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
@@ -37,7 +38,6 @@ Other:
 	- * add non-collapsible functions (_setjmp)
 	- * tersely collapsed functions should not display nested functions of bare/fully collapsed functions
 	- * add transformer with bounds testing (strncat/strncpy() are good examples)
-	- * add in libunwind support
 	- * Unified calling for mmap()'ed buffers
 	- * TSD should pass temporary heap for quick operations
 	- * Remove transformer call stack (replace with pltexit/inregs?)

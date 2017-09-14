@@ -118,6 +118,9 @@ AC_SEARCH_LIBS([cplus_demangle], [iberty_pic iberty],
 AC_SEARCH_LIBS([elf_getscn], [elf], [],
 	[AC_MSG_ERROR([libelf not found; must be installed (try libelf-dev)])])
 
+AC_SEARCH_LIBS([unw_backtrace], [unwind], [],
+	[AC_MSG_ERROR([libunwind not found; must be installed (try libunwind-dev)])])
+
 AC_CONFIG_HEADER([src/autoconf.h])
 AC_CONFIG_FILES([src/autoconf.make])
 AC_CONFIG_FILES([doc/asciidoc.conf])

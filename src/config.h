@@ -524,6 +524,11 @@ do { \
 
 
 //#define USE_GLIBC_FEATURES	1
+#define USE_LIBUNWIND	1
+
+#ifdef USE_LIBUNWIND
+extern void backtrace_unwind(ucontext_t *start_context);
+#endif
 
 extern int glibc_unsafe;
 
@@ -545,7 +550,7 @@ extern void safe_free(void *ptr);
 #else
 	#define SAFETY_WARNING(func)		if (glibc_unsafe) {	\
 							/* PRINT_ERROR("Warning: potentially unsafe call to %s() from line %d, file %s\n", func, __LINE__, __FILE__); */	\
-							/*_print_backtrace(); */ \
+							/* _print_backtrace(); */ \
 						}
 	#define XMALLOC_ASSIGN(val,parm)	do {	\
 							SAFETY_WARNING("malloc");	\
