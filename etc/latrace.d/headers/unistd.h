@@ -85,6 +85,7 @@ void   _exit(int status);
 long   pathconf(char *path, int name);
 long   fpathconf(int fd, int name);
 long   sysconf~(int name=sysconf_name);
+long   __sysconf~(int name=sysconf_name);
 size_t confstr(int name, char *buf, size_t len);
 
 

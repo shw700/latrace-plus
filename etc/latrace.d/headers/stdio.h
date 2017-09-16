@@ -5,23 +5,19 @@ int remove(char *filename);
 int rename(char *old, char *new);
 int renameat(int oldfd, char *old, int newfd, char *new);
 
-
 FILE *tmpfile(void);
 FILE *tmpfile64(void);
 char *tmpnam(char *s);
 char *tmpnam_r(char *s);
 char *tempnam(char *dir, char *pfx);
 
-
 int fclose~(FILE *stream);
 int fflush~(FILE *stream);
 int fflush_unlocked(FILE *stream);
 int fcloseall(void);
 
-
 FILE* fopen(char *filename, char *modes);
 FILE* freopen(char *filename, char *modes, FILE *stream);
-
 
 FILE* fopen64(char *filename, char *modes);
 FILE* freopen64(char *filename, char *modes, FILE *stream);
@@ -30,12 +26,13 @@ FILE* fopencookie(void *magic_cookie, char *modes, void *io_funcs);
 FILE* fmemopen(void *s, size_t len, char *modes);
 FILE* open_memstream(void *bufloc, size_t *sizeloc);
 
+int fpurge~(FILE *stream);
+void __fpurge~(FILE *stream);
 
 void setbuf(FILE *stream, char *buf);
 int  setvbuf~(FILE *stream, char *buf/p, int modes, size_t n);
 void setbuffer(FILE *stream, char *buf, size_t size);
 void setlinebuf(FILE *stream);
-
 
 int fprintf(FILE *stream, char *format);
 int printf(char *format);
@@ -81,7 +78,6 @@ int fputs(char *s, FILE *stream);
 int puts(char *s);
 int ungetc(int c, FILE *stream);
 
-
 size_t  fread(void *ptr, size_t size, size_t n, FILE *stream);
 size_t  fwrite(void *ptr, size_t size, size_t n, FILE *s);
 int     fputs_unlocked~(char *s, FILE *stream);
@@ -90,36 +86,29 @@ size_t  fwrite_unlocked(void *ptr, size_t size, size_t n, FILE *stream);
 int     fseek(FILE *stream, long off, int whence);
 long    ftell(FILE *stream);
 
-
 void    rewind(FILE *stream);
 int     fseeko(FILE *stream, __off_t off, int whence);
 __off_t ftello(FILE *stream);
 int     fgetpos~(FILE *stream, fpos_t *pos);
 int     fsetpos(FILE *stream, fpos_t *pos);
 
-
 typedef long  __off64_t;
 typedef void  fpos64_t;
-
 
 int             fseeko64(FILE *stream, __off64_t off, int whence);
 __off64_t       ftello64(FILE *stream);
 
-
 int fgetpos64(FILE *stream, fpos64_t *pos);
 int fsetpos64(FILE *stream, fpos64_t *pos);
 
-
 void clearerr(FILE *stream);
 int  feof~(FILE *stream);
-int  ferror(FILE *stream);
+int  ferror~(FILE *stream);
 void clearerr_unlocked(FILE *stream);
 int  feof_unlocked~(FILE *stream);
 int  ferror_unlocked(FILE *stream);
 
-
 void perror(char *s);
-
 
 int     fileno~(FILE *stream);
 int     fileno_unlocked(FILE *stream);
@@ -128,10 +117,8 @@ int     pclose(FILE *stream);
 char*   ctermid(char *s);
 char*   cuserid(char *s);
 
-
 int  obstack_printf(void *obstack, char *format);
 int  obstack_vprintf(void *obstack, char *format);
 void flockfile(FILE *stream);
 int  ftrylockfile(FILE *stream);
 void funlockfile(FILE *stream);
-

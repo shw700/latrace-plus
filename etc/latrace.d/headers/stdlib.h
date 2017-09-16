@@ -143,7 +143,7 @@ char*   realpath(char *name, char *resolved);
 
 
 void*   bsearch(void *key, void *base, size_t nmemb, size_t size, void *compar);
-void    qsort!(void *base, size_t nmemb, size_t size, pfn compar);
+void    qsort^(void *base, size_t nmemb, size_t size, pfn compar);
 
 
 int     abs(int x);

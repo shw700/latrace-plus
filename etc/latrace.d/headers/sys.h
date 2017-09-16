@@ -27,3 +27,5 @@ int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struc
 int clone(void *fn, void *child_stack, int flags, void *arg);
 int sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask);
 int sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask);
+
+ssize_t lgetxattr~(const char *__path, const char *__name, void *__value, size_t __size);

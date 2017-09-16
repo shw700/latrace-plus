@@ -8,8 +8,12 @@ void __cxa_guard_release~(__guard*);
 void __ctype_init(void);
 int __printf_chk~(int flag, const char * format);
 int __fprintf_chk~(FILE *__stream, int __flag, char *__format, ...);
+int __sprintf_chk~(char *__s, int __flag, size_t __slen, const char *__format, ...);
 int __snprintf_chk~(char *__s, size_t __n, int __flag, size_t __slen, const char *__format, ...);
 int __vsnprintf_chk~(char *s, size_t maxlen, int flags, size_t slen, const char *format, va_list args);
+char *__strcpy_chk~(char *dest, const char *src, size_t destlen);
+void *__memcpy_chk~(void *__dest, const void *__src, size_t __len, size_t __destlen);
+void *__mempcpy_chk~(void *__dest, const void *__src, size_t __len, size_t __destlen);
 void *__rawmemchr~(const void *__s, int __c);
 int __freading~(FILE *__fp);
 size_t __fpending~(FILE *__fp);
@@ -39,6 +43,7 @@ wctype_t __wctype_l~(const char *property, __locale_t locale);
 
 pfn __nss_lookup_function~(void *nip, char *fnname);
 int _nss_files_parse_pwent~(char *line, struct passwd *result, struct parser_data *data, size_t datalen, int *errnop);
+int __nss_database_lookup~(const char *database, const char *alternative_name, const char *defconfig, service_user **ni);
 
 /* pthread internal */
 int __pthread_key_create~(pthread_key_t *key, pfn *destr);
@@ -69,13 +74,26 @@ long int __strtol_internal~(const char *__nptr, char **__endptr/p, int __base, i
 unsigned long __strtoull_internal~(const char *__nptr, char **__endptr, int __base, int __group);
 
 /* glibc / libresolv */
+void error~(int status, int errnum, const char *format, ...);
+
 unsigned int __ns_get16~(unsigned char *buf);
 unsigned long __ns_get32~(unsigned char *buf);
 int __ns_name_unpack~(const u_char *msg, const u_char *eom, const u_char *src, u_char *dst, size_t dstsiz);
 int __ns_name_ntop~(const u_char *src, char *dst/p, size_t dstsiz);
 
+/* selinux */
 int is_selinux_enabled~(void);
 int is_selinux_mls_enabled~(void);
+int getfilecon~(const char *path, security_context_t *con);
+int lgetfilecon~(const char *path, security_context_t *con);
+int fgetfilecon~(int fd, security_context_t *con);
+
+/* libacl */
+int __acl_extended_file(const char *path_p, pfn fun);
+int acl_extended_file(const char *path_p);
+int acl_extended_file_nofollow(const char *path_p);
+
+
 
 /* proc */
 PROCTAB* openproc!(int flags/x, ...);
@@ -130,12 +148,31 @@ enum_bm regcomp_flags {
 	REG_NOSUB    = 8
 };
 
+/* globbing */
+enum_bm fnmatch_opt {
+	FNM_PATHNAME    = 0x1,
+	FNM_NOESCAPE    = 0x2,
+	FNM_PERIOD      = 0x4,
+	FNM_LEADING_DIR = 0x8,
+	FNM_CASEFOLD    = 0x10,
+	FNM_EXTMATCH    = 0x20
+};
+
+int fnmatch~(const char *pattern, const char *string, int flags=fnmatch_opt);
+
 int regcomp(regex_t *preg, const char *regex, int cflags=regcomp_flags);
 int regexec(const regex_t *preg, const char *string, size_t nmatch, regmatch_t *pmatch, int eflags);
 void regfree!(regex_t *preg);
 
+typedef unsigned long reg_syntax_t;
+int re_search^(struct re_pattern_buffer *__buffer, const char *__string, int __length, int __start, int __range, struct re_registers *__regs);
+reg_syntax_t re_set_syntax~(reg_syntax_t __syntax);
+const char *re_compile_pattern^(const char *__pattern, size_t __length, struct re_pattern_buffer *__buffer);
+
 /* libbsd */
 size_t strlcpy~(char *dst/p, const char *src, size_t siz);
+size_t strlcat~(char *dst, const char *src, size_t size);
+
 
 /* zlib */
 typedef void *z_streamp;
@@ -144,3 +181,27 @@ int inflateInit2_(z_streamp strm, int windowBits, const char *version, int strea
 int inflateReset(z_streamp strm);
 int inflateReset2(z_streamp strm, int windowBits);
 int inflateResetKeep(z_streamp strm);
+
+/* obstack */
+int _obstack_begin~(struct obstack *h, int size, int alignment, pfn chunkfun, pfn freefun);
+
+/* bfd */
+typedef int bfd_boolean;
+typedef unsigned long bfd_vma;
+
+enum bfd_format
+{
+	bfd_unknown = 0,
+	bfd_object,
+	bfd_archive,
+	bfd_core,
+	bfd_type_end
+};
+
+void bfd_init~(void);
+struct bfd_hash_entry *bfd_hash_lookup^(struct bfd_hash_table *table, const char *name, bfd_boolean create, bfd_boolean copy);
+bfd_vma bfd_scan_vma~(const char *string, const char **end, int base);
+bfd_boolean bfd_check_format~(bfd *abfd, bfd_format format);
+
+
+

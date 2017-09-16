@@ -1,10 +1,10 @@
 /* arch-specific */
 #include "sysdeps/x86_64/latrace.h"
 
-/* miscelaneous typedefs */
+/* miscellaneous typedefs */
 #include "typedefs.h"
 
-/* miscelaneous functions */
+/* miscellaneous functions */
 #include "misc.h"
 
 /* /usr/include/arpa/inet.h */

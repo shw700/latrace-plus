@@ -17,17 +17,17 @@ int glibc_unsafe = 0;
 
 
 inline void *
-xmalloc(size_t size) {
+xxmalloc(size_t size) {
 	return malloc(size);
 }
 
 inline void *
-xrealloc(void *ptr, size_t size) {
+xxrealloc(void *ptr, size_t size) {
 	return realloc(ptr, size);
 }
 
 inline char *
-xstrdup(const char *s) {
+xxstrdup(const char *s) {
 	return strdup(s);
 }
 

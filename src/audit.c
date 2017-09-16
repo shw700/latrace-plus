@@ -64,6 +64,7 @@ static __thread lt_tsd_t *this_tsd = NULL;
 static pthread_mutex_t tsd_lock = PTHREAD_MUTEX_INITIALIZER;
 
 lt_tsd_t *thread_get_tsd(int create);
+static void set_excised_data(lt_tsd_t *tsd, pid_t tid, const char *msg);
 
 
 STATIC int check_names(char *name, char **ptr)
@@ -228,7 +229,8 @@ STATIC int sym_entry(const char *symname, void *ptr,
 			len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
 					"", lib_to, lib_from, tsd->excised, argdbuf, collapsed);
 			lt_fifo_send(&cfg, tsd->pipe_fd, buf, len);
-			safe_free(tsd->excised);
+			// Not necessarily a point in deallocating this
+			tsd->excised[0] = 0;
 			tsd->excised = NULL;
 		}
 
@@ -251,7 +253,8 @@ STATIC int sym_entry(const char *symname, void *ptr,
 	if (tsd->excised) {
 		lt_out_entry(cfg.sh, &tv, syscall(SYS_gettid), tsd->indent_depth, collapsed,
 			"", lib_to, lib_from, tsd->excised, argdbuf, &tsd->nsuppressed);
-		safe_free(tsd->excised);
+		// Not necessarily a point in deallocating this
+		tsd->excised[0] = 0;
 		tsd->excised = NULL;
 	}
 
@@ -571,6 +574,16 @@ uintptr_t la_symbind64(Elf64_Sym *sym, unsigned int ndx, uintptr_t *refcook,
 {
 	lt_tsd_t *tsd = NULL;
 
+	if (!strcmp(symname, "__longjmp_chk") || !strcmp(symname, "__sigsetjmp")) {
+		char warning[256];
+
+		snprintf(warning, sizeof(warning), "%s(): skipping over bind to function with problematic call stack", symname);
+		tsd = thread_get_tsd(0);
+		set_excised_data(tsd, syscall(SYS_gettid), warning);
+		*flags |= LA_SYMB_NOPLTENTER|LA_SYMB_NOPLTEXIT;
+		return sym->st_value;
+	}
+
 	if (!(tsd = thread_get_tsd(1))) {
 		PRINT_ERROR("Could not get TSD for la_symbind64() / %s in thread %ld\n", symname, syscall(SYS_gettid));
 		*flags = la_symbind(sym, symname, tsd);
@@ -731,6 +744,7 @@ thread_get_tsd(int create)
 		}
 
 		memset(tsd, 0, sizeof(*tsd));
+		tsd->is_new = 1;
 		tsd->last_operation = -1;
 		this_tsd = pkd = tsd;
 //		pthread_setspecific(lt_thread_pkey, pkd);
@@ -764,12 +778,53 @@ thread_get_tsd(int create)
 		}
 
 		memset(tsd, 0, sizeof(*tsd));
+		tsd->is_new = 1;
 		tsd->last_operation = -1;
 		pkd = tsd;
 		SETSPECIFIC(this_thread, PKEY_ID_TSD, pkd, NULL);
 	}
 
 	return (lt_tsd_t *)pkd;
+}
+
+#define EXCISE_MAX	4000
+static
+void set_excised_data(lt_tsd_t *tsd, pid_t tid, const char *msg)
+{
+	char *excised;
+	size_t elen, eleft;
+
+	excised = GETSPECIFIC(tid, PKEY_ID_EXCISED, NULL);
+
+	if (!excised) {
+		excised = safe_malloc(EXCISE_MAX);
+		if (!excised) {
+			PRINT_ERROR_SAFE("Error allocating space for excised data: %s\n", strerror(errno));
+			return;
+		}
+
+		memset(excised, 0, EXCISE_MAX);
+	}
+
+	elen = strlen(excised);
+	eleft = EXCISE_MAX - elen;
+
+	if (eleft < 4)
+		return;
+
+	if (elen) {
+		excised[elen++] = ';';
+		excised[elen++] = ' ';
+		eleft -= 2;
+	}
+
+	strncpy(&excised[elen], msg, eleft);
+	SETSPECIFIC(tid, PKEY_ID_EXCISED, excised, NULL);
+
+	if (tsd && !tsd->excised)
+		tsd->excised = excised;
+
+	return;
 }
 
 ElfW(Addr)
@@ -784,6 +839,15 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 	int ret = 0;
 	int tls_volatile = 0;
 	pid_t this_thread = syscall(SYS_gettid);
+
+	if (!strcmp(symname, "_dl_sym")) {
+		char warning[256];
+
+		snprintf(warning, sizeof(warning), "%s(): skipping over problematic function call", symname);
+		tsd = thread_get_tsd(0);
+		set_excised_data(tsd, this_thread, warning);
+		return sym->st_value;
+	}
 
 	if (lt_thread_pkey_init < 0)
 		return sym->st_value;
@@ -872,24 +936,10 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 
 	if (!tsd || tls_volatile) {
 		if (!tsd) {
-			size_t eleft, elen;
-			char *prefix = "";
+			char warning[256];
 
-			excised = GETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL);
-
-			if (!excised) {
-				excised = safe_malloc(4000);
-				memset(excised, 0, 4000);
-			}
-
-			elen = strlen(excised);
-
-			if (elen)
-				prefix = "; ";
-
-			eleft = 4000 - elen;
-			snprintf(&excised[elen], eleft, "%s%s(): cannot track function with TLS in volatile state", prefix, symname);
-			SETSPECIFIC(this_thread, PKEY_ID_EXCISED, excised, NULL);
+			snprintf(warning, sizeof(warning), "%s(): cannot track function with TLS in volatile state", symname);
+			set_excised_data(tsd, this_thread, warning);
 		}
 
 		return sym->st_value;
@@ -900,9 +950,15 @@ pltenter(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 	TSD_SET(last_symbol, symname);
 	TSD_SET(last_operation, 0);
 #endif
+	if (tsd->is_new) {
+		excised = GETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL);
+		tsd->is_new = 0;
+	}
 
-	if (excised)
+	if (excised) {
 		tsd->excised = excised;
+		SETSPECIFIC(this_thread, PKEY_ID_EXCISED, NULL, NULL);
+	}
 
 	do {
 		CHECK_DISABLED(sym->st_value);
@@ -934,7 +990,12 @@ unsigned int pltexit(ElfW(Sym) *sym, unsigned int ndx, uintptr_t *refcook,
 	struct link_map *ld = (struct link_map*) *defcook;
 
 	if (!(tsd = thread_get_tsd(0))) {
-		PRINT_ERROR("Could not get TSD for pltexit() in thread %ld\n", syscall(SYS_gettid));
+		char warning[256];
+
+		PRINT_ERROR("Could not get TSD for pltexit() on symbol \"%s\" in thread %ld\n",
+			symname, syscall(SYS_gettid));
+		snprintf(warning, sizeof(warning), "%s(): function did not observe normal return", symname);
+		set_excised_data(NULL, syscall(SYS_gettid), warning);
 		return 0;
 	}
 

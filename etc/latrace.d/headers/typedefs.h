@@ -14,6 +14,7 @@ typedef unsigned long uint64_t;
 
 typedef int socklen_t;
 typedef unsigned int size_t;
+typedef signed long ssize_t;
 
 typedef void FILE;
 typedef void DIR;

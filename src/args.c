@@ -1483,7 +1483,10 @@ do {                                                                 \
 } while(0)
 
 	if (arg->bitmask_class) {
-		len = snprintf(argbuf, alen, "%s", lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt));
+		char *bm = lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt);
+
+		len = snprintf(argbuf, alen, "%s", bm);
+		XFREE(bm);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "o"))) {
 		ARGS_SPRINTF("0%o", unsigned int);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "d"))) {

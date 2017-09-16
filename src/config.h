@@ -100,6 +100,8 @@ typedef struct lt_tsd {
 
 	void *stack_start;
 	void *stack_end;
+
+	int is_new;
 } lt_tsd_t;
 
 #define TSD_SET(memb,val)	do { if (tsd) tsd->memb = val; } while (0)
@@ -530,15 +532,17 @@ do { \
 //#define USE_GLIBC_FEATURES	1
 #define USE_LIBUNWIND	1
 
+#ifdef TRANSFORMER_CRASH_PROTECTION
 #ifdef USE_LIBUNWIND
 extern void backtrace_unwind(ucontext_t *start_context);
+#endif
 #endif
 
 extern int glibc_unsafe;
 
-extern void *xmalloc(size_t size);
-extern void *xrealloc(void *ptr, size_t size);
-extern char *xstrdup(const char *s);
+extern void *xxmalloc(size_t size);
+extern void *xxrealloc(void *ptr, size_t size);
+extern char *xxstrdup(const char *s);
 extern void _print_backtrace(void);
 
 extern void *safe_malloc(size_t size);
@@ -549,9 +553,9 @@ extern char *safe_strdup(const char *s);
 #define SANITY_CHECK(ret)		if (!ret) { PRINT_ERROR("%s", "Fatal internal memory error; allocation returned NULL.\n"); }
 
 #ifdef USE_GLIBC_FEATURES
-	#define XMALLOC_ASSIGN(val,parm)	do { val = xmalloc(parm); SANITY_CHECK(val); } while (0)
-	#define XREALLOC_ASSIGN(val,p1,p2)	do { val = xrealloc(p1,p2); SANITY_CHECK(val); } while (0)
-	#define XSTRDUP_ASSIGN(val,parm)	do { val = xstrdup(parm); SANITY_CHECK(val); } while (0)
+	#define XMALLOC_ASSIGN(val,parm)	do { val = xxmalloc(parm); SANITY_CHECK(val); } while (0)
+	#define XREALLOC_ASSIGN(val,p1,p2)	do { val = xxrealloc(p1,p2); SANITY_CHECK(val); } while (0)
+	#define XSTRDUP_ASSIGN(val,parm)	do { val = xxstrdup(parm); SANITY_CHECK(val); } while (0)
 	#define XFREE(parm)			free(parm)
 #else
 	#define SAFETY_WARNING(func)		if (glibc_unsafe) {	\
@@ -560,15 +564,15 @@ extern char *safe_strdup(const char *s);
 						}
 	#define XMALLOC_ASSIGN(val,parm)	do {	\
 							SAFETY_WARNING("malloc");	\
-							val = xmalloc(parm); \
+							val = xxmalloc(parm); \
 							SANITY_CHECK(val); } while (0)
 	#define XREALLOC_ASSIGN(val,p1,p2)	do {	\
 							SAFETY_WARNING("realloc");	\
-							val = xrealloc(p1,p2); \
+							val = xxrealloc(p1,p2); \
 							SANITY_CHECK(val); } while (0)
 	#define XSTRDUP_ASSIGN(val,parm)	do {	\
 							SAFETY_WARNING("strdup");	\
-							val = xstrdup(parm); \
+							val = xxstrdup(parm); \
 							SANITY_CHECK(val); } while (0)
 	#define XFREE(parm)			do {	\
 							SAFETY_WARNING("free");	\

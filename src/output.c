@@ -357,7 +357,7 @@ int lt_out_entry(struct lt_config_shared *cfg,
 		}
 
 		if (!lib_from || !*lib_from)
-			lib_from = "[]";
+			lib_from = "";
 		else {
 			char *chrptr = strrchr(lib_from, '/');
 
