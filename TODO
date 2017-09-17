@@ -24,20 +24,21 @@ bugs
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- * everything should still compile fine without libunwind present
-	- * introduce more aggressive/thread-safe drop-in for perror() and strerror() usage
+	- ** introduce more aggressive/thread-safe drop-in for perror() and strerror() usage
 
 Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
-	- Rigid assumptions made of 64 bit ELF objects in transformer libraries
+	- * Rigid assumptions made of 64 bit ELF objects in transformer libraries
 	- * Allow all type definitions to be overridden by most recent declaration
 	- Suppress identical output lines?
 	- * New library loads should trigger symbol load
 	- Support for calling existing signal handlers for SIGILL/SIGSEGV/SIGBUS which are overwritten
-	- * get rid of old bm_enum declaration type
+	- ** get rid of old bm_enum declaration type
 	- Should probably reap old thread_buffers to prevent memory leakage (and fix efficiency bug)
-	- * add non-collapsible functions (_setjmp)
+	- ** add non-collapsible functions (_setjmp)
 	- * tersely collapsed functions should not display nested functions of bare/fully collapsed functions
-	- ** TSD should pass temporary heap for quick operations
-	- ** Remove transformer call stack (replace with pltexit/inregs?)
+	- TSD should pass temporary heap for quick operations
+	- * Remove transformer call stack (replace with pltexit/inregs?)
 	- replace other invocations of DEMANGLE()
-	- * vastly improve custom heap efficiency
+	- ** vastly improve custom heap efficiency
+	- ** allow removed address mapping not to generate error on NULL address

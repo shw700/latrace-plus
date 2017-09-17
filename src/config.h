@@ -525,7 +525,7 @@ do { \
 #define PRINT_ERROR	PRINT_ERROR_SAFE
 #define PRINT_ERROR_SAFE(fmt, ...)	do { char buf[1024]; memset(buf, 0, sizeof(buf));	\
 					snprintf(buf, sizeof(buf), BOLDRED fmt RESET, __VA_ARGS__);	\
-					write(STDERR_FILENO, buf, strlen(buf)); \
+					if (write(STDERR_FILENO, buf, strlen(buf))) { }  \
 					fsync(STDERR_FILENO); } while (0)
 
 
