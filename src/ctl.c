@@ -48,7 +48,7 @@ static int mmap_config(struct lt_config_ctl *cfg)
 	int fd, len;
 
 	if (-1 == (fd = open(cfg->config, O_RDWR))) {
-		PRINT_ERROR("open failed on config file %s: %s\n", cfg->config, strerror(errno));
+		PERROR_PRINTF("open failed on config file %s", cfg->config);
 		return -1;
 	}
 

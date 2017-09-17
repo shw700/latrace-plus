@@ -52,7 +52,7 @@ static struct lt_include inc = {
 int lt_args_parse_init(struct lt_config_shared *cfg, struct lt_include *inc);
 
 static int enum_init = 0;
-static int bm_enum_init = 0;
+static int enum_bm_init = 0;
 
 static struct lt_config_shared *bm_config = NULL;
 
@@ -302,7 +302,7 @@ static struct lt_arg args_def_typedef[LT_ARGS_DEF_TYPEDEF_NUM];
 static int args_def_struct_cnt  = 0;
 static int args_def_typedef_cnt = 0;
 static struct hsearch_data args_enum_tab;
-static struct hsearch_data args_bm_enum_tab;
+static struct hsearch_data args_enum_bm_tab;
 
 
 struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
@@ -331,53 +331,53 @@ struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
-struct lt_bm_enum* getbmenum(struct lt_config_shared *cfg, char *name)
+struct lt_enum_bm *getbmenum(struct lt_config_shared *cfg, char *name)
 {
-	struct lt_bm_enum *en;
+	struct lt_enum_bm *en;
 	ENTRY e, *ep;
 
 	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
 
-	if (!bm_enum_init) {
-		PRINT_VERBOSE(cfg, 1, "no bm_enum added so far\n", name);
+	if (!enum_bm_init) {
+		PRINT_VERBOSE(cfg, 1, "no enum_bm added so far\n", name);
 		return NULL;
 	}
 
 	e.key = name;
-	hsearch_r(e, FIND, &ep, &args_bm_enum_tab);
+	hsearch_r(e, FIND, &ep, &args_enum_bm_tab);
 
 	if (!ep) {
-		PRINT_VERBOSE(cfg, 1, "failed to find bm_enum <%s>\n", name);
+		PRINT_VERBOSE(cfg, 1, "failed to find enum_bm <%s>\n", name);
 		return NULL;
 	}
 
-	en = (struct lt_bm_enum*) ep->data;
+	en = (struct lt_enum_bm *)ep->data;
 
 	PRINT_VERBOSE(cfg, 1, "found %p <%s>\n", en, en->name);
 	return en;
 }
 
-STATIC struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
+STATIC struct lt_enum_bm *getenum_bm(struct lt_config_shared *cfg, char *name)
 {
-	struct lt_bm_enum *en;
+	struct lt_enum_bm *en;
 	ENTRY e, *ep;
 
 	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
 
-	if (!bm_enum_init) {
-		PRINT_VERBOSE(cfg, 1, "no bm_enum added so far\n", name);
+	if (!enum_bm_init) {
+		PRINT_VERBOSE(cfg, 1, "no enum_bm added so far\n", name);
 		return NULL;
 	}
 
 	e.key = name;
-	hsearch_r(e, FIND, &ep, &args_bm_enum_tab);
+	hsearch_r(e, FIND, &ep, &args_enum_bm_tab);
 
 	if (!ep) {
-		PRINT_VERBOSE(cfg, 1, "failed to find bm_enum <%s>\n", name);
+		PRINT_VERBOSE(cfg, 1, "failed to find enum_bm <%s>\n", name);
 		return NULL;
 	}
 
-	en = (struct lt_bm_enum*) ep->data;
+	en = (struct lt_enum_bm *)ep->data;
 
 	PRINT_VERBOSE(cfg, 1, "found %p <%s>\n", en, en->name);
 	return en;
@@ -386,7 +386,7 @@ STATIC struct lt_bm_enum* getbm_enum(struct lt_config_shared *cfg, char *name)
 char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt) {
 	char lbuf[1024], *result;
 	unsigned long left = val;
-	struct lt_bm_enum* bm_enum;
+	struct lt_enum_bm *enum_bm;
 	struct lt_enum* _enum = NULL;
 
 	if (!class)
@@ -397,16 +397,16 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 
 	memset(lbuf, 0, sizeof(lbuf));
 
-	bm_enum = getbm_enum(cfg, (char *)class);
+	enum_bm = getenum_bm(cfg, (char *)class);
 
-	if (!bm_enum)
+	if (!enum_bm)
 		_enum = getenum(cfg, (char *)class);
 
-	if (bm_enum) {
+	if (enum_bm) {
 		size_t i;
 
-		for(i = 0; i < bm_enum->cnt; i++) {
-			struct lt_bm_enum_elem *elem = &bm_enum->elems[i];
+		for(i = 0; i < enum_bm->cnt; i++) {
+			struct lt_enum_bm_elem *elem = &enum_bm->elems[i];
 
 			if (elem->val == val) {
 				strcpy(lbuf, elem->name);
@@ -488,10 +488,10 @@ STATIC int enum_comp(const void *ep1, const void *ep2)
 	return e1->val - e2->val;
 }
 
-STATIC int bm_enum_comp(const void *ep1, const void *ep2)
+STATIC int enum_bm_comp(const void *ep1, const void *ep2)
 {
-	struct lt_bm_enum_elem *e1 = (struct lt_bm_enum_elem*) ep1;
-	struct lt_bm_enum_elem *e2 = (struct lt_bm_enum_elem*) ep2;
+	struct lt_enum_bm_elem *e1 = (struct lt_enum_bm_elem*) ep1;
+	struct lt_enum_bm_elem *e2 = (struct lt_enum_bm_elem*) ep2;
 
 	return e1->val - e2->val;
 }
@@ -544,7 +544,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	/* Initialize the hash table holding enum names */
 	if (!enum_init) {
 	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_enum_tab)) {
-	                perror("failed to create hash table:");
+	                PERROR("failed to create hash table:");
 			XFREE(en);
 	                return -1;
 	        }
@@ -555,7 +555,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	e.data = en;
 
 	if (!hsearch_r(e, ENTER, &ep, &args_enum_tab)) {
-		perror("hsearch_r failed");
+		PERROR("hsearch_r failed");
 		XFREE(en);
 		return 1;
 	}
@@ -663,12 +663,12 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	return 0;
 }
 
-int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name, 
+int lt_args_add_enum_bm(struct lt_config_shared *cfg, char *name, 
 			struct lt_list_head *h)
 {
 	ENTRY e, *ep;
-	struct lt_bm_enum_elem *elem;
-	struct lt_bm_enum *en;
+	struct lt_enum_bm_elem *elem;
+	struct lt_enum_bm *en;
 	int i = 0;
 
 	XMALLOC_ASSIGN(en, sizeof(*en));
@@ -679,21 +679,21 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	en->name = name;
 
 	/* Initialize the hash table holding enum names */
-	if (!bm_enum_init) {
-	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_bm_enum_tab)) {
-	                perror("failed to create hash table:");
+	if (!enum_bm_init) {
+	        if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_enum_bm_tab)) {
+	                PERROR("failed to create hash table:");
 			XFREE(en);
 	                return -1;
 	        }
-		bm_enum_init = 1;
+		enum_bm_init = 1;
 		bm_config = cfg;
 	}
 
 	e.key = en->name;
 	e.data = en;
 
-	if (!hsearch_r(e, ENTER, &ep, &args_bm_enum_tab)) {
-		perror("hsearch_r failed");
+	if (!hsearch_r(e, ENTER, &ep, &args_enum_bm_tab)) {
+		PERROR("hsearch_r failed");
 		XFREE(en);
 		return 1;
 	}
@@ -704,11 +704,11 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 	lt_list_for_each_entry(elem, h, list)
 		en->cnt++;
 
-	XMALLOC_ASSIGN(en->elems, sizeof(struct lt_bm_enum_elem) * en->cnt);
+	XMALLOC_ASSIGN(en->elems, sizeof(struct lt_enum_bm_elem) * en->cnt);
 	if (!en->elems)
 		return -1;
 
-	PRINT_VERBOSE(cfg, 3, "bm_enum %s (%d elems) not fixed\n",
+	PRINT_VERBOSE(cfg, 3, "enum_bm %s (%d elems) not fixed\n",
 			en->name, en->cnt);
 
 	lt_list_for_each_entry(elem, h, list) {
@@ -718,7 +718,7 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 		en->elems[i++] = *elem;
 	}
 
-	PRINT_VERBOSE(cfg, 3, "bm_enum %s (%d elems) fixed\n",
+	PRINT_VERBOSE(cfg, 3, "enum_bm %s (%d elems) fixed\n",
 			en->name, en->cnt);
 
 	/* fixup values */
@@ -726,7 +726,7 @@ int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
 		elem = &en->elems[i];
 
 	/* finally sort the array */
-	qsort(en->elems, en->cnt, sizeof(struct lt_bm_enum_elem), bm_enum_comp);
+	qsort(en->elems, en->cnt, sizeof(struct lt_enum_bm_elem), enum_bm_comp);
 	return 0;
 }
 
@@ -791,10 +791,10 @@ struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg,
 	return elem;
 }
 
-struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg, 
+struct lt_enum_bm_elem *lt_args_get_enum_bm(struct lt_config_shared *cfg, 
 	const char *name, const char *val)
 {
-	struct lt_bm_enum_elem* elem;
+	struct lt_enum_bm_elem* elem;
 
 	XMALLOC_ASSIGN(elem, sizeof(*elem));
 	if (!elem)
@@ -826,7 +826,7 @@ struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg,
 	if (!elem->name)
 		return NULL;
 
-	PRINT_VERBOSE(cfg, 3, "bm_enum elem %s = %d\n", elem->name, elem->val);
+	PRINT_VERBOSE(cfg, 3, "enum_bm elem %s = %d\n", elem->name, elem->val);
 	return elem;
 }
 
@@ -856,7 +856,7 @@ int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 	if (!h) {
 		XMALLOC_ASSIGN(h, sizeof(*h));
 		if (!h) {
-			perror("xmalloc failed");
+			PERROR("xmalloc failed");
 			return -1;
 		}
 
@@ -939,7 +939,7 @@ int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *ret,
 	e.data = sym;
 
 	if (!hsearch_r(e, ENTER, &ep, &cfg->args_tab)) {
-		perror("hsearch_r failed");
+		PERROR("hsearch_r failed");
 		XFREE(sym);
 		/* we dont want to exit just because 
 		   we ran out of our symbol limit */
@@ -962,7 +962,7 @@ STATIC struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 
 	XMALLOC_ASSIGN(arg, sizeof(*arg));
 	if (!arg) {
-		perror("xmalloc failed");
+		PERROR("xmalloc failed");
 		return NULL;
 	}
 
@@ -974,7 +974,7 @@ STATIC struct lt_arg* argdup(struct lt_config_shared *cfg, struct lt_arg *asrc)
 	/* For structures we need also to copy all its arguments. */
 	XMALLOC_ASSIGN(h, sizeof(*h));
 	if (!h) {
-		perror("xmalloc failed");
+		PERROR("xmalloc failed");
 		XFREE(arg);
 		return NULL;
 	}
@@ -1256,7 +1256,7 @@ int lt_args_init(struct lt_config_shared *cfg)
 	}
 
 	if (!hcreate_r(LT_ARGS_TAB, &cfg->args_tab)) {
-		PRINT_ERROR("Failed to create hash table: %s", strerror(errno));
+		PERROR("Failed to create hash table");
 		return -1;
 	}
 

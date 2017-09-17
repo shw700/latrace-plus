@@ -45,7 +45,7 @@ enum SIGNAL_HANDLER {
 	SIG_ERR = -1
 };
 
-bm_enum sa_flag {
+enum_bm sa_flag {
 	SA_NOCLDSTOP  =  0x00000001,
 	SA_NOCLDWAIT  =  0x00000002,
 	SA_SIGINFO    =  0x00000004,

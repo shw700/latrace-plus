@@ -29,12 +29,12 @@ int tty_master(struct lt_config_app *cfg)
 	int mfd;
 
 	if ((mfd = getpt()) < 0) {
-		perror("getpt failed");
+		PERROR("getpt failed");
 		return -1;
 	}
 
 	if (unlockpt(mfd)) {
-		perror("unlockpt failed");
+		PERROR("unlockpt failed");
 		return -1;
 	}
 
@@ -63,7 +63,7 @@ int tty_init(struct lt_config_app *cfg, int master)
 
 	/* get new session before we open new controling tty */
 	if (-1 == setsid()) {
-		perror("setsid failed");
+		PERROR("setsid failed");
 		return -1;
 	}
 
@@ -115,7 +115,7 @@ int tty_process(struct lt_config_app *cfg, int master)
 		fd = open(cfg->output_tty_file, O_RDWR | O_CREAT | O_TRUNC,
 				S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 		if (fd < 0) {
-			perror("failed to open OUTPUT_TTY file,"
+			PERROR("failed to open OUTPUT_TTY file,"
 				" output is not logged");
 			return -1;
 		}
@@ -138,7 +138,7 @@ int tty_process(struct lt_config_app *cfg, int master)
 		return -1;
 
 	if (write(fd, buf, ret) <= 0) {
-		perror("failed to write to OUTPUT_TTY file");
+		PERROR("failed to write to OUTPUT_TTY file");
 		return -1;
 	}
 

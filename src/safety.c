@@ -95,8 +95,10 @@ void *
 _allocate_pages(size_t n) {
 	void *result;
 
-	if ((result = mmap(NULL, (PAGE_SIZE*n), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED)
+	if ((result = mmap(NULL, (PAGE_SIZE*n), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
+		PERROR("mmap");
 		return NULL;
+	}
 
 	return result;
 }
@@ -343,7 +345,7 @@ _initialize_buckets(void) {
 
 	for (i = 0; i < sizeof(bucket_locks)/sizeof(bucket_locks[0]); i++) {
 		if (pthread_mutex_init(&bucket_locks[i], NULL))
-			perror("pthread_mutex_init");
+			PERROR("pthread_mutex_init");
 	}
 
 	_prepare_free_chunks();
@@ -381,8 +383,10 @@ safe_malloc(size_t size) {
 		else
 			real_size = (real_size + PAGE_SIZE) & ~(PAGE_SIZE - 1);
 
-		if ((result = mmap(NULL, real_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED)
+		if ((result = mmap(NULL, real_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
+			PERROR("mmap");
 			return NULL;
+		}
 
 		flags = CHUNK_FLAG_DIRECT_MAP;
 	}

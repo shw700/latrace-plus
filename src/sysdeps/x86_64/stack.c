@@ -592,7 +592,7 @@ enter_transformer_callstack(char *symname, La_regs *inregs, void **args, size_t 
 	}
 
 	if (!tsd->xfm_call_stack) {
-		PRINT_ERROR("Error allocating space for call stack: %s\n", strerror(errno));
+		PERROR("Error allocating space for call stack");
 		return;
 	}
 

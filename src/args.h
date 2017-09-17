@@ -54,16 +54,16 @@ enum {
 	LT_ARGS_TYPEID_CUSTOM = 1000
 };
 
-struct lt_bm_enum_elem {
+struct lt_enum_bm_elem {
 	char *name;
 	long val;
 	struct lt_list_head list;
 };
 
-struct lt_bm_enum {
+struct lt_enum_bm {
 	char *name;
 	int cnt;
-	struct lt_bm_enum_elem *elems;
+	struct lt_enum_bm_elem *elems;
 };
 
 struct lt_enum_elem {
@@ -173,10 +173,10 @@ int lt_args_sym_exit(struct lt_config_shared *cfg, struct lt_symbol *sym,
 			int silent, lt_tsd_t *tsd);
 int lt_args_add_enum(struct lt_config_shared *cfg, char *name, int bitmask,
 			struct lt_list_head *h);
-int lt_args_add_bm_enum(struct lt_config_shared *cfg, char *name,
+int lt_args_add_enum_bm(struct lt_config_shared *cfg, char *name,
 			struct lt_list_head *h);
 struct lt_enum_elem* lt_args_get_enum(struct lt_config_shared *cfg, char *name, char *val);
-struct lt_bm_enum_elem* lt_args_get_bm_enum(struct lt_config_shared *cfg, const char *name, const char *val);
+struct lt_enum_bm_elem* lt_args_get_enum_bm(struct lt_config_shared *cfg, const char *name, const char *val);
 int lt_args_add_struct(struct lt_config_shared *cfg, char *type_name,
 			struct lt_list_head *h);
 int lt_args_add_sym(struct lt_config_shared *cfg, struct lt_arg *sym,

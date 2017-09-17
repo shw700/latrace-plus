@@ -117,7 +117,7 @@ static int match_ptn(struct lt_config_audit *cfg, const char *name,
 	XMALLOC_ASSIGN(*ret, (strlen(name) + strlen(s->dst)));
 	r = *ret;
 	if (!r) {
-		perror("xmalloc failed");
+		PERROR("xmalloc failed");
 		return 0;
 	}
 

@@ -698,10 +698,10 @@ setup_tsd_pkeys(void)
 
 	pthread_key_create(&lt_thread_pkey, NULL);
 	if (pthread_key_create(&lt_thread_pkey, NULL) != 0) {
-		PRINT_ERROR("Failed to create thread specific data: %s\n", strerror(errno));
+		PERROR("Failed to create thread specific data");
 		lt_thread_pkey_init = -1;
 	} else if (pthread_key_create(&lt_tsd_pkey, NULL) != 0) {
-		PRINT_ERROR("Failed to create thread specific data[2]: %s\n", strerror(errno));
+		PERROR("Failed to create thread specific data[2]:");
 		lt_thread_pkey_init = -1;
 	} else {
 //		pthread_setspecific(lt_thread_pkey, PKEY_VAL_INITIALIZED);
@@ -739,7 +739,7 @@ thread_get_tsd(int create)
 
 		XMALLOC_ASSIGN(tsd, sizeof(lt_tsd_t));
 		if (!tsd) {
-			PRINT_ERROR("Error creating TSD: %s\n", strerror(errno));
+			PERROR("Error creating TSD");
 			return NULL;
 		}
 
@@ -773,7 +773,7 @@ thread_get_tsd(int create)
 		//XMALLOC_ASSIGN(tsd, sizeof(lt_tsd_t));
 		tsd = safe_malloc(sizeof(*tsd));
 		if (!tsd) {
-			PRINT_ERROR("Error creating TSD: %s\n", strerror(errno));
+			PERROR("Error creating TSD");
 			return NULL;
 		}
 
@@ -799,7 +799,7 @@ void set_excised_data(lt_tsd_t *tsd, pid_t tid, const char *msg)
 	if (!excised) {
 		excised = safe_malloc(EXCISE_MAX);
 		if (!excised) {
-			PRINT_ERROR_SAFE("Error allocating space for excised data: %s\n", strerror(errno));
+			PERROR("Error allocating space for excised data");
 			return;
 		}
 
@@ -1233,21 +1233,21 @@ crash_handler_si(int signo, siginfo_t *si, void *ucontext)
 
 		switch(fork()) {
 			case -1:
-				PRINT_ERROR_SAFE("Could not fork to launch gdb: %s\n", strerror(errno));
+				PERROR("Could not fork to launch gdb");
 				break;
 			case 0:
 				{
 					unsetenv("LIBLDAUDIT_PATH");
 					unsetenv("LD_AUDIT");
 					execl("/usr/bin/gdb", "/usr/bin/gdb", "attach", tid_buf, NULL);
-					perror("execl");
+					PERROR("execl");
 					_exit(-1);
 				}
 				break;
 			default:
 				sleep(sleep_val);
 				setcontext(ucontext);
-				PRINT_ERROR_SAFE("Error calling setcontext: %s\n", strerror(errno));
+				PERROR("Error calling setcontext");
 				break;
 		}
 
@@ -1282,7 +1282,7 @@ setup_crash_handlers(void)
 
 	if ((sigaction(SIGILL, &sa, NULL) == -1) || (sigaction(SIGBUS, &sa, NULL) == -1) ||
 		(sigaction(SIGSEGV, &sa, NULL) == -1)) {
-		perror("sigaction");
+		PERROR("sigaction");
 		return -1;
 	}
 

@@ -48,7 +48,7 @@ static int init_ctl_config(char *file)
 	int fd;
 
 	if (-1 == (fd = open(file, O_RDWR))) {
-		PRINT_ERROR("open failed on config file %s: %s\n", file, strerror(errno));
+		PERROR_PRINTF("open failed on config file %s", file);
 		return -1;
 	}
 
@@ -86,17 +86,17 @@ static int read_config(char *dir)
 	sprintf(file, "%s/config", dir);
 
 	if (-1 == (fd = open(file, O_RDONLY))) {
-		PRINT_ERROR("open failed on config file %s: %s\n", file, strerror(errno));
+		PERROR_PRINTF("open failed on config file %s", file);
 		return -1;
 	}
 
 	if (-1 == read(fd, &cfg.sh_storage, sizeof(cfg.sh_storage))) {
-		perror("read failed");
+		PERROR("read failed");
 		return -1;
 	}
 
 	if (-1 == (len = lseek(fd, 0, SEEK_END))) {
-		perror("lseek failed");
+		PERROR("lseek failed");
 		return -1;
 	}
 
@@ -167,7 +167,7 @@ static size_t get_symtab_size(const char *filename, size_t *strtab_size)
 	size_t sym_count;
 
 	if ((fd = open(filename, O_RDONLY)) < 0) {
-		perror("open");
+		PERROR("open");
 		return 0;
 	}
 
@@ -209,17 +209,17 @@ static int setup_user_data_handlers(void)
 {
 
 	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_struct_xfm_tab)) {
-		perror("failed to create hash table:");
+		PERROR("failed to create hash table:");
 		return -1;
 	}
 
 	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_func_xfm_tab)) {
-		perror("failed to create hash table:");
+		PERROR("failed to create hash table:");
 		return -1;
 	}
 
 	if (!hcreate_r(LT_ARGS_DEF_ENUM_NUM, &args_func_intercept_tab)) {
-		perror("failed to create hash table:");
+		PERROR("failed to create hash table:");
 		return -1;
 	}
 
@@ -228,7 +228,7 @@ static int setup_user_data_handlers(void)
 
 
 int glob_err(const char *epath, int eerrno) {
-//	PRINT_ERROR("Encountered globbing error: %s\n", strerror(eerrno));
+//	PERROR("Encountered globbing error");
 	return 0;
 }
 
@@ -277,7 +277,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 		PRINT_ERROR("%s", "No transformers directory found; skipping.\n");
 		return 0;
 	} else if (ret != 0 && ret != GLOB_NOMATCH) {
-		PRINT_ERROR("Unable to read transformers libraries directory: %s\n", strerror(errno));
+		PERROR("Unable to read transformers libraries directory");
 		return -1;
 	}
 
@@ -364,7 +364,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 					XSTRDUP_ASSIGN(e.key, funcname);
 					if (!e.key) {
-						perror("strdup");
+						PERROR("strdup");
 						dlclose(handle);
 						return -1;
 					}
@@ -372,7 +372,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_struct_xfm_tab)) {
-						perror("hsearch_r failed");
+						PERROR("hsearch_r failed");
 						symtab++, sym_count++;
 						continue;
 					}
@@ -393,7 +393,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 					XSTRDUP_ASSIGN(e.key, funcname);
 					if (!e.key) {
-						perror("strdup");
+						PERROR("strdup");
 						dlclose(handle);
 						return -1;
 					}
@@ -401,7 +401,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_xfm_tab)) {
-						perror("hsearch_r failed");
+						PERROR("hsearch_r failed");
 						symtab++, sym_count++;
 						continue;
 					}
@@ -422,7 +422,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 					XSTRDUP_ASSIGN(e.key, funcname);
 					if (!e.key) {
-						perror("strdup");
+						PERROR("strdup");
 						dlclose(handle);
 						return -1;
 					}
@@ -430,7 +430,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 					e.data = sym_addr;
 
 					if (!hsearch_r(e, ENTER, &ep, &args_func_intercept_tab)) {
-						perror("hsearch_r failed");
+						PERROR("hsearch_r failed");
 						symtab++, sym_count++;
 						continue;
 					}

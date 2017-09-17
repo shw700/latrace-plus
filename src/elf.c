@@ -110,7 +110,7 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 	}
 
 	if (!addr_mappings) {
-		PRINT_ERROR("Error allocating memory for address mapping: %s\n", strerror(errno));
+		PERROR("Error allocating memory for address mapping");
 		return;
 	}
 
@@ -144,10 +144,13 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 }
 
 void
-remove_address_mapping(void *symaddr, size_t size, const char *hint) {
+remove_address_mapping(void *symaddr, size_t size, const char *hint, int null_ok) {
 	unsigned char *caddr = (unsigned char *)symaddr;
 	size_t ind;
 	int insert;
+
+	if (null_ok && !symaddr)
+		return;
 
 	pthread_rwlock_wrlock(&mapping_lock);
 
@@ -341,7 +344,7 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 //	XMALLOC_ASSIGN(result, rsize);
 	result = safe_malloc(rsize);
 	if (!result) {
-		perror("xmalloc");
+		PERROR("xmalloc");
 		return 0;
 	}
 

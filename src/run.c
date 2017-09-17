@@ -63,12 +63,12 @@ static int store_config(struct lt_config_app *cfg, char *file)
 	}
 
 	if (-1 == (fd = open(file, O_CREAT | O_TRUNC | O_RDWR, mode))) {
-		PRINT_ERROR("open failed on config file %s: %s\n", file, strerror(errno));
+		PERROR_PRINTF("open failed on config file %s", file);
 		return -1;
 	}
 
         if (-1 == write(fd, cfg->sh, sizeof(*cfg->sh))) {
-                perror("read failed");
+                PERROR("read failed");
                 return -1;
         }
 
@@ -81,7 +81,7 @@ static int get_config_dir(char *buf, int len)
 {
 	snprintf(buf, len , "%s-XXXXXX", CONFIG_LT_CONFIG);
 	if (NULL == mkdtemp(buf)) {
-		perror("mkdtemp failed");
+		PERROR("mkdtemp failed");
 		return -1;
 	}
 
@@ -95,7 +95,7 @@ static int get_fifo(struct lt_config_app *cfg, int fd_notify,
 	struct inotify_event *event = (struct inotify_event*) buf;
 
 	if (-1 == read(fd_notify, event, 1000)) {
-		perror("read notify failed");
+		PERROR("read notify failed");
 		return -1;
 	}
 
@@ -226,7 +226,7 @@ if (ret < 0) \
 		ret = select(max_fd + 1, &wrk_set, NULL, NULL, &tv);
 		if (-1 == ret) {
 			if (errno != EINTR)
-				perror("select failed");
+				PERROR("select failed");
 			return -1;
 		}
 
@@ -292,7 +292,7 @@ static int remove_dir(struct lt_config_app *cfg, char *name)
 	PRINT_VERBOSE(cfg, 1, "removing %s\n", name);
 
 	if (NULL == (dir = opendir(name))) {
-		perror("opendir failed");
+		PERROR("opendir failed");
 		return -1;
 	}
 
@@ -306,7 +306,7 @@ static int remove_dir(struct lt_config_app *cfg, char *name)
 
 		sprintf(file, "%s/%s", name, d->d_name);
 		if (stat(file, &st)) {
-			perror("stat failed");
+			PERROR("stat failed");
 			continue;
 		}
 
@@ -316,13 +316,13 @@ static int remove_dir(struct lt_config_app *cfg, char *name)
 		}
 
 		if (unlink(file))
-			perror("unlink failed");
+			PERROR("unlink failed");
 	}
 
 	closedir(dir);
 
 	if (-1 == remove(name)) {
-		perror("remove failed");
+		PERROR("remove failed");
 		return -1;
 	}
 
@@ -463,7 +463,7 @@ static int run_child(struct lt_config_app *cfg,
 		exit(-1);
 
 	} else if (pa->pid < 0) {
-		perror("fork failed");
+		PERROR("fork failed");
 		return -1;
 	}
 

@@ -75,7 +75,7 @@ static FILE* open_include(struct lt_config_shared *cfg, char *file)
 
 	/* give up if there was already the absolute name */
 	if (*file == '/') {
-		printf("open failed [%s]: %s\n", file, strerror(errno));
+		PERROR_PRINTF("open failed [%s]", file);
 		return NULL;
 	}
 

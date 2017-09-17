@@ -29,7 +29,7 @@ const char *call_lookup_addr(void *addr, char *outbuf, size_t bufsize);
 
 void *(*sym_lookup_addr)(void *) = NULL;
 void (*sym_add_address_mapping)(void *, size_t, const char *) = NULL;
-void (*sym_remove_address_mapping)(void *, size_t, const char *) = NULL;
+void (*sym_remove_address_mapping)(void *, size_t, const char *, int) = NULL;
 
 
 int latrace_func_to_str_strdup(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
@@ -170,7 +170,7 @@ int latrace_func_to_str_realloc(void **args, size_t argscnt, char *buf, size_t b
 
 	// realloc(NULL, ...) is of course valid
 	if (sym_remove_address_mapping && *ptr)
-		sym_remove_address_mapping(*ptr, 0, "realloc");
+		sym_remove_address_mapping(*ptr, 0, "realloc", 1);
 
 	if (sym_add_address_mapping) {
 		char tokbuf[32];
@@ -193,7 +193,7 @@ void latrace_func_intercept_free(void **args, size_t argscnt, void *retval)
 		return;
 
 	ptr = (void **)args[0];
-	sym_remove_address_mapping(*ptr, 0, "free");
+	sym_remove_address_mapping(*ptr, 0, "free", 1);
 	return;
 }
 
@@ -228,6 +228,6 @@ int latrace_func_to_str_munmap(void **args, size_t argscnt, char *buf, size_t bl
 	addr = (void **)args[0];
 	size = (size_t *)args[1];
 
-	sym_remove_address_mapping(*addr, *size, "munmap");
+	sym_remove_address_mapping(*addr, *size, "munmap", 0);
 	return -1;
 }

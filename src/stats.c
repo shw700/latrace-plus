@@ -39,13 +39,13 @@ int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 
 	if (!t->sym_array) {
 		if (!hcreate_r(t->sym_max = LT_SYM_HMAX, &t->sym_htab)) {
-			perror("hcreate_r failed");
+			PERROR("hcreate_r failed");
 			return -1;
 		}
 
 		XMALLOC_ASSIGN(t->sym_array, t->sym_max * sizeof(struct lt_stats_sym*));
 		if (!t->sym_array) {
-			perror("xmalloc failed");
+			PERROR("xmalloc failed");
 			return -1;
 		}
 
@@ -63,13 +63,13 @@ int lt_stats_alloc(struct lt_config_app *cfg, struct lt_thread *t)
 	PRINT_VERBOSE(cfg, 1, "%s\n", "creating new hash table");
 
 	if (!hcreate_r(t->sym_max, &t->sym_htab)) {
-		perror("hcreate_r failed");
+		PERROR("hcreate_r failed");
 		return -1;
 	}
 
 	XREALLOC_ASSIGN(t->sym_array, t->sym_array, (t->sym_max * sizeof(struct lt_stats_sym*)));
 	if (!t->sym_array) {
-		perror("realloc failed");
+		PERROR("realloc failed");
 		return -1;
 	}
 

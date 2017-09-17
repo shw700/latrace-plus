@@ -527,6 +527,22 @@ do { \
 					snprintf(buf, sizeof(buf), BOLDRED fmt RESET, __VA_ARGS__);	\
 					if (write(STDERR_FILENO, buf, strlen(buf))) { }  \
 					fsync(STDERR_FILENO); } while (0)
+#define PERROR(func)	do {	\
+				char errbuf[256];	\
+				PRINT_ERROR("%s: %s", func, strerror_r(errno, errbuf, sizeof(errbuf)));	\
+			} while (0)
+#define PERROR_PRINTF(fmt,...)	do {	\
+						char msgbuf[256], errbuf[256];	\
+						ssize_t max = sizeof(msgbuf);	\
+						memset(msgbuf, 0, sizeof(msgbuf));	\
+						max -= snprintf(msgbuf, sizeof(msgbuf), fmt, __VA_ARGS__);	\
+						if (max > 3) {	\
+							strerror_r(errno, errbuf, sizeof(errbuf));	\
+							snprintf(&msgbuf[strlen(msgbuf)], max, ": %s\n", errbuf);	\
+							if (write(STDERR_FILENO, msgbuf, strlen(msgbuf))) { }	\
+							fsync(STDERR_FILENO);	\
+						}	\
+					} while (0)
 
 
 //#define USE_GLIBC_FEATURES	1

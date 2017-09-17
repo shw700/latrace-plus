@@ -1,7 +1,7 @@
 
 /* /usr/include/sys/mman.h */
 
-bm_enum mmap_prot {
+enum_bm mmap_prot {
 	PROT_NONE      = 0x0,
 	PROT_READ      = 0x1,
 	PROT_WRITE     = 0x2,

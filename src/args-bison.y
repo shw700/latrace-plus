@@ -95,7 +95,7 @@ do { \
 %}
 
 
-%token NAME FILENAME STRUCT ENUM BM_ENUM BM_ENUMX TYPEDEF INCLUDE END POINTER ATTRIBUTE
+%token NAME FILENAME STRUCT ENUM ENUM_BM TYPEDEF INCLUDE END POINTER ATTRIBUTE
 
 %union
 {
@@ -113,9 +113,6 @@ do { \
 %type <head>      ENUM_DEF
 %type <s>         ENUM_REF
 %type <enum_elem> ENUM_ELEM
-%type <head>      BM_ENUM_DEF
-/*%type <s>         BM_ENUM_REF */
-%type <bm_enum_elem> BM_ENUM_ELEM
 %type <head>      ARGS
 %type <arg>       DEF
 
@@ -125,8 +122,6 @@ entry struct_def
 |
 entry enum_def
 | 
-entry bm_enum_def
-|
 entry func_def
 |
 entry type_def
@@ -188,7 +183,7 @@ STRUCT_DEF DEF ';'
 
 /* enum definitions */
 enum_def:
-BM_ENUMX NAME '{' ENUM_DEF '}' ';'
+ENUM_BM NAME '{' ENUM_DEF '}' ';'
 {
 	switch(lt_args_add_enum(scfg, $2, 1, $4)) {
 	case -1:
@@ -247,44 +242,6 @@ NAME
 EMPTY_COMMA:
  /* empty */
 
-
-/* bitmasked enum definitions */
-bm_enum_def:
-BM_ENUM NAME '{' BM_ENUM_DEF '}' ';'
-{
-	switch(lt_args_add_bm_enum(scfg, $2, $4)) {
-	case -1:
-		ERROR("failed to add bm_enum[1] %s\n", $2);
-	case 1:
-		ERROR("bm_enum limit reached(%d) - %s\n", LT_ARGS_DEF_STRUCT_NUM, $2);
-	};
-}
-
-BM_ENUM_DEF:
-BM_ENUM_DEF ',' BM_ENUM_ELEM
-{
-	struct lt_bm_enum_elem *bm_enum_elem = $3;
-	struct lt_list_head *h = $1;
-
-	lt_list_add_tail(&bm_enum_elem->list, h);
-	$$ = h;
-}
-| BM_ENUM_ELEM
-{
-	struct lt_list_head *h;
-	struct lt_bm_enum_elem *bm_enum_elem = $1;
-
-	GET_LIST_HEAD(h);
-	lt_list_add_tail(&bm_enum_elem->list, h);
-	$$ = h;
-}
-
-BM_ENUM_ELEM:
-NAME '=' NAME
-{
-	if (NULL == ($$ = lt_args_get_bm_enum(scfg, $1, $3)))
-		ERROR("failed to add bm_enum[2] '%s = %s'\n", $1, $3);
-}
 
 type_def:
 TYPEDEF NAME NAME ';'

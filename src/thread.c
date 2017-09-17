@@ -31,7 +31,7 @@ struct lt_thread *lt_thread_add(struct lt_config_app *cfg, int fd, pid_t pid)
 
 	XMALLOC_ASSIGN(t, sizeof(*t));
 	if (!t) {
-		perror("xmalloc failed");
+		PERROR("xmalloc failed");
 		return NULL;
 	}
 

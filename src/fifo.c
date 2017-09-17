@@ -60,12 +60,12 @@ int lt_fifo_create(struct lt_config_audit *cfg, char *dir)
 		(pid_t) syscall(SYS_gettid));
 
 	if ((-1 == mkfifo(fifo, 0666)) && errno != EEXIST) {
-		perror("mkfifo failed");
+		PERROR("mkfifo failed");
 		return -1;
 	}
 
 	if (-1 == (fd = open(fifo, O_WRONLY))) {
-		perror("open fifo failed");
+		PERROR("open fifo failed");
 		return -1;
 	}
 
@@ -81,7 +81,7 @@ int lt_fifo_open(struct lt_config_app *cfg, char *dir, char *name)
 	PRINT_VERBOSE(cfg, 1, "opening fifo: %s\n", str_fifo);
 
 	if (-1 == (fd = open(str_fifo, O_RDONLY)))
-		perror("open fifo failed");
+		PERROR("open fifo failed");
 
 	PRINT_VERBOSE(cfg, 1, "pipe openned fd: %d\n", fd);
 	return fd;
@@ -95,11 +95,11 @@ int lt_fifo_notify_fd(struct lt_config_app *cfg, char *dir)
 
 	if (stat(notify_dir, &st)) {
 		if (mkdir(notify_dir, S_IRWXU)) {
-			perror("mkdir failed");
+			PERROR("mkdir failed");
 			return -1;
 		}
 		if (stat(notify_dir, &st)) {
-			perror("stat failed");
+			PERROR("stat failed");
 			return -1;
 		}
 	}
@@ -111,12 +111,12 @@ int lt_fifo_notify_fd(struct lt_config_app *cfg, char *dir)
 	}
 
 	if (-1 == (fd = inotify_init())) {
-		perror("inotify_init failed");
+		PERROR("inotify_init failed");
 		return -1;
 	}
 
 	if (-1 == inotify_add_watch(fd, notify_dir, IN_CREATE)) {
-		perror("inotify_add_watch failed");
+		PERROR("inotify_add_watch failed");
 		return -1;
 	}
 
@@ -132,7 +132,7 @@ int lt_fifo_send(struct lt_config_audit *cfg, int fd, char *buf, int len)
 		char errbuf[32];
 
 		sprintf(errbuf, "write(%d,) failed:", fd);
-		perror(errbuf);
+		PERROR(errbuf);
 		return -1;
 	}
 
@@ -150,7 +150,7 @@ int lt_fifo_recv(struct lt_config_app *cfg, struct lt_thread *t, void *buf,
 	struct lt_fifo_mbase *h = buf;
 
 	if (-1 == (size = read(t->fifo_fd, h, sizeof(struct lt_fifo_mbase)))) {
-		perror("read failed");
+		PERROR("read failed");
 		return -1;
 	}
 
@@ -167,7 +167,7 @@ int lt_fifo_recv(struct lt_config_app *cfg, struct lt_thread *t, void *buf,
 	}
 
 	if (-1 == (size = read(t->fifo_fd, buf + sizeof(*h), h->len))) {
-		perror("read failed");
+		PERROR("read failed");
 		return -1;
 	}
 

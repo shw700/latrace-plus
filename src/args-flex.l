@@ -77,8 +77,7 @@ whitespace	([ \t])
 <<EOF>>			{ return END; }
 "struct"		{ return STRUCT; }
 "enum"			{ return ENUM; }
-"bm_enum"		{ return BM_ENUM; }
-"enum_bm"		{ return BM_ENUMX; }
+"enum_bm"		{ return ENUM_BM; }
 "typedef"		{ return TYPEDEF; }
 {name}[!~^]?(\/[opxduh])?	{ lt_args_lval.s = strdup(lt_args_text); return NAME; }
 "\*"+			{ lt_args_lval.s = strdup(lt_args_text); return POINTER; }
