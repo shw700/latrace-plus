@@ -12,7 +12,7 @@ void call_lookup_bitmask_by_class(const char *class, unsigned long val, const ch
 
 
 const char *(*sym_lookup_addr)(void *, char *, size_t) = NULL;
-char *(*sym_lookup_bitmask_by_class)(void *ignored, const char *, unsigned long, const char *) = NULL;
+char *(*sym_lookup_bitmask_by_class)(void *ignored, const char *, unsigned long, const char *, char *, size_t) = NULL;
 
 
 int latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t bufsize);
@@ -93,27 +93,44 @@ int
 latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t blen)
 {
 	char sigbuf[512];
-	int s;
+	int s, inverted = 0;
+	size_t sig_tot = 0;
 
 	if (obj == NULL)
 		return -1;
 
 	memset(sigbuf, 0, sizeof(sigbuf));
 
-	for (s = 1; s < _NSIG; s++) {
+	for (s = 1; s < _NSIG; s++)
+		sig_tot += sigismember(obj, s);
 
-		if (sigismember(obj, s)) {
-			char signo_buf[16];
-			const char *signame = get_signal_name(s);
+	if (_NSIG - sig_tot < 16)
+		inverted = 1;
 
-			if (!signame) {
-				snprintf(signo_buf, sizeof(signo_buf), "%d", s);
-				signame = signo_buf;
+	if (sig_tot == _NSIG-1)
+		strcpy(sigbuf, "ALL SIGNALS");
+	else if (!sig_tot)
+		strcpy(sigbuf, "EMPTY");
+	else {
+
+		for (s = 1; s < _NSIG; s++) {
+
+			if ((!inverted && sigismember(obj, s)) ||
+				(inverted && !sigismember(obj, s))) {
+				char signo_buf[16];
+				const char *signame = get_signal_name(s);
+
+				if (!signame) {
+					snprintf(signo_buf, sizeof(signo_buf), "%d", s);
+					signame = signo_buf;
+				}
+
+				if (sigbuf[0])
+					strcat(sigbuf, ",");
+
+				strcat(sigbuf, signame);
 			}
 
-			if (sigbuf[0])
-				strcat(sigbuf, ",");
-			strcat(sigbuf, signame);
 		}
 
 	}
@@ -121,7 +138,11 @@ latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t blen)
 	if (sigbuf[0] && sigbuf[strlen(sigbuf)-1] == ',')
 		sigbuf[strlen(sigbuf)-1] = 0;
 
-	snprintf(buf, blen, "[%s]", sigbuf);
+	if (inverted)
+		snprintf(buf, blen, "![%s]", sigbuf);
+	else
+		snprintf(buf, blen, "[%s]", sigbuf);
+
 	return 0;
 }
 
@@ -131,7 +152,7 @@ latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t blen)
 	char sigbuf[512];
 	char flagsbuf[128];
 	char handlerbuf[128];
-	int s;
+//	int s;
 
 	if (obj == NULL)
 		return -1;
@@ -141,7 +162,9 @@ latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t blen)
 	memset(handlerbuf, 0, sizeof(handlerbuf));
 	call_lookup_bitmask_by_class("sa_flag", obj->sa_flags, NULL, flagsbuf, sizeof(flagsbuf));
 
-	for (s = 1; s < _NSIG; s++) {
+	latrace_struct_to_str_sigset_t(&obj->sa_mask, sigbuf, sizeof(sigbuf));
+
+/*	for (s = 1; s < _NSIG; s++) {
 
 		if (sigismember(&obj->sa_mask, s)) {
 			char signo_buf[16];
@@ -157,7 +180,7 @@ latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t blen)
 			strcat(sigbuf, signame);
 		}
 
-	}
+	} */
 
 	if (obj->sa_flags & SA_SIGINFO)
 		snprintf(handlerbuf, sizeof(handlerbuf), "sigaction=%p", obj->sa_sigaction);
@@ -181,12 +204,9 @@ call_lookup_bitmask_by_class(const char *class, unsigned long val, const char *f
 	char *maskstr = NULL;
 
 	if (sym_lookup_bitmask_by_class)
-		maskstr = sym_lookup_bitmask_by_class(NULL, class, val, fmt);
+		maskstr = sym_lookup_bitmask_by_class(NULL, class, val, fmt, buf, bufsize);
 
-	if (maskstr) {
-		strncpy(buf, maskstr, bufsize);
-		free(maskstr);
-	} else
+	if (!maskstr)
 		snprintf(buf, bufsize, "0x%lx", val);
 
 	return;

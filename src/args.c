@@ -362,8 +362,7 @@ struct lt_enum_bm *getenum_bm(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
-char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt) {
-	char lbuf[1024], *result;
+char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt, char *outbuf, size_t bufsize) {
 	unsigned long left = val;
 	struct lt_enum_bm *enum_bm;
 	struct lt_enum* _enum = NULL;
@@ -374,7 +373,7 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 	if (!cfg)
 		cfg = bm_config;
 
-	memset(lbuf, 0, sizeof(lbuf));
+	memset(outbuf, 0, bufsize);
 
 	enum_bm = getenum_bm(cfg, (char *)class);
 
@@ -388,19 +387,23 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 			struct lt_enum_bm_elem *elem = &enum_bm->elems[i];
 
 			if (elem->val == val) {
-				strcpy(lbuf, elem->name);
+				strncpy(outbuf, elem->name, bufsize);
 				left = 0;
 				break;
 			}
 
 			if (elem->val && (left >= elem->val) && ((left & elem->val) == elem->val)) {
-				if (strlen(lbuf))
-					strcat(lbuf, "|");
+				size_t cleft = bufsize - (strlen(outbuf) + 1);
 
-				strcat(lbuf, elem->name);
+				if (outbuf[0]) {
+					strncat(outbuf, "|", cleft);
+					cleft--;
+				}
+
+				strncat(outbuf, elem->name, cleft);
 				left &= ~(elem->val);
 			} else if ((val == 0) && (elem->val == 0)) {
-				strcpy(lbuf, elem->name);
+				strncpy(outbuf, elem->name, bufsize);
 				break;
 			}
 
@@ -413,13 +416,17 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 			struct lt_enum_elem *elem = &_enum->elems[i];
 
 			if (elem->val && (left >= elem->val) && ((left & elem->val) == elem->val)) {
-				if (strlen(lbuf))
-					strcat(lbuf, "|");
+				size_t cleft = bufsize - (strlen(outbuf) + 1);
 
-				strcat(lbuf, elem->name);
+				if (outbuf[0]) {
+					strncat(outbuf, "|", cleft);
+					cleft--;
+				}
+
+				strncat(outbuf, elem->name, cleft);
 				left &= ~(elem->val);
 			} else if ((val == 0) && (elem->val == 0)) {
-				strcpy(lbuf, elem->name);
+				strncpy(outbuf, elem->name, bufsize);
 				break;
 			}
 
@@ -430,10 +437,13 @@ char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, u
 
 left:
 	if (left) {
+		size_t cleft = bufsize - (strlen(outbuf) + 1);
 		char tmpbuf[32];
 
-		if (strlen(lbuf))
-			strcat(lbuf, "|");
+		if (outbuf[0]) {
+			strncat(outbuf, "|", cleft);
+			cleft--;
+		}
 
 		if (fmt && !strcmp(fmt, "o"))
 			sprintf(tmpbuf, "0%o", (unsigned int)left);
@@ -444,19 +454,18 @@ left:
 		else
 			sprintf(tmpbuf, "0x%x", (unsigned int) left);
 
-		if (!strlen(lbuf))
-			strcpy(lbuf, tmpbuf);
+		if (!outbuf[0])
+			strncpy(outbuf, tmpbuf, bufsize);
 		else
-			strcat(lbuf, tmpbuf);
+			strncat(outbuf, tmpbuf, cleft);
 		
 	}
 
 	/* Make sure we report a plain old zero */
-	if (!val && !lbuf[0])
-		lbuf[0] = '0';
+	if (!val && !outbuf[0])
+		outbuf[0] = '0';
 
-	XSTRDUP_ASSIGN(result, lbuf);
-	return result;
+	return outbuf;
 } 
 
 STATIC int enum_comp(const void *ep1, const void *ep2)
@@ -1463,10 +1472,10 @@ do {                                                                 \
 } while(0)
 
 	if (arg->bitmask_class) {
-		char *bm = lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt);
+		char bmstr[1024];
 
+		char *bm = lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt, bmstr, sizeof(bmstr));
 		len = snprintf(argbuf, alen, "%s", bm);
-		XFREE(bm);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "o"))) {
 		ARGS_SPRINTF("0%o", unsigned int);
 	} else if (arg->fmt && (!strcmp(arg->fmt, "d"))) {
