@@ -3,6 +3,7 @@
 
   This file is part of the latrace.
 
+
   The latrace is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
@@ -310,12 +311,14 @@ struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 	struct lt_enum *en;
 	ENTRY e, *ep;
 
-	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
-
 	if (!enum_init) {
-		PRINT_VERBOSE(cfg, 1, "no enum added so far\n", name);
+		if (cfg)
+			PRINT_VERBOSE(cfg, 1, "request for <%s> but no enum added so far\n", name);
+
 		return NULL;
 	}
+
+	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
 
 	e.key = name;
 	hsearch_r(e, FIND, &ep, &args_enum_tab);
@@ -331,43 +334,19 @@ struct lt_enum* getenum(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
-struct lt_enum_bm *getbmenum(struct lt_config_shared *cfg, char *name)
+struct lt_enum_bm *getenum_bm(struct lt_config_shared *cfg, char *name)
 {
 	struct lt_enum_bm *en;
 	ENTRY e, *ep;
 
-	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
-
 	if (!enum_bm_init) {
-		PRINT_VERBOSE(cfg, 1, "no enum_bm added so far\n", name);
+		if (cfg)
+			PRINT_VERBOSE(cfg, 1, "request for <%s> but no enum_bm added so far\n", name);
+
 		return NULL;
 	}
-
-	e.key = name;
-	hsearch_r(e, FIND, &ep, &args_enum_bm_tab);
-
-	if (!ep) {
-		PRINT_VERBOSE(cfg, 1, "failed to find enum_bm <%s>\n", name);
-		return NULL;
-	}
-
-	en = (struct lt_enum_bm *)ep->data;
-
-	PRINT_VERBOSE(cfg, 1, "found %p <%s>\n", en, en->name);
-	return en;
-}
-
-STATIC struct lt_enum_bm *getenum_bm(struct lt_config_shared *cfg, char *name)
-{
-	struct lt_enum_bm *en;
-	ENTRY e, *ep;
 
 	PRINT_VERBOSE(cfg, 1, "request for <%s>\n", name);
-
-	if (!enum_bm_init) {
-		PRINT_VERBOSE(cfg, 1, "no enum_bm added so far\n", name);
-		return NULL;
-	}
 
 	e.key = name;
 	hsearch_r(e, FIND, &ep, &args_enum_bm_tab);
@@ -549,6 +528,7 @@ int lt_args_add_enum(struct lt_config_shared *cfg, char *name,
 	                return -1;
 	        }
 		enum_init = 1;
+		bm_config = cfg;
 	}
 
 	e.key = en->name;

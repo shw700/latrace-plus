@@ -34,7 +34,7 @@ int lt_args_lex(void);
 void lt_args_error(const char *m);
 
 extern struct lt_enum *getenum(struct lt_config_shared *cfg, char *name);
-extern struct lt_bm_enum *getbmenum(struct lt_config_shared *cfg, char *name);
+extern struct lt_bm_enum *getenum_bm(struct lt_config_shared *cfg, char *name);
 extern struct lt_arg* find_arg(struct lt_config_shared *cfg, const char *type,
 				struct lt_arg argsdef[], int size, int create);
 
@@ -329,15 +329,24 @@ ARGS ',' DEF
 }
 | NAME
 {
+	struct lt_list_head *h;
+	struct lt_arg *arg = NULL;
 
 	if (!getenum(scfg, $1)) {
-		if (find_arg(scfg, $1, args_def_pod, LT_ARGS_DEF_POD_NUM, 0) == NULL)
-	                ERROR("unnamed variable of unknown type: %s\n", $1);
 
-		GET_LIST_HEAD($$);
+		if (find_arg(scfg, $1, args_def_pod, LT_ARGS_DEF_POD_NUM, 0) == NULL) {
+
+			if (NULL == (arg = lt_args_getarg(scfg, $1, ANON_PREFIX, 0, 1, NULL)))
+				ERROR("unnamed variable of unknown type: %s\n", $1);
+
+			GET_LIST_HEAD(h);
+			lt_list_add_tail(&arg->args_list, h);
+			$$ = h;
+		} else {
+			GET_LIST_HEAD($$);
+		}
+
 	} else {
-		struct lt_list_head *h;
-		struct lt_arg *arg = NULL;
 
 		if (NULL == (arg = lt_args_getarg(scfg, "int", ANON_PREFIX, 0, 1, $1)))
 			ERROR("unknown error parsing anonymous enum instance of type: %s\n", $1);
@@ -409,7 +418,7 @@ NAME NAME ENUM_REF
 
 	if (NULL == (arg = lt_args_getarg(scfg, $1, $2, 0, 1, $3))) {
 		if (getenum(scfg, $1) == NULL) {
-			if (getbmenum(scfg, $1) == NULL)
+			if (getenum_bm(scfg, $1) == NULL)
 				ERROR("unknown argument type[2a] - %s; possibly due to enum specification of \"%s\"\n", $1, $3);
 		}
 
@@ -531,7 +540,7 @@ ENUM_REF:
 include_def: INCLUDE '"' FILENAME '"'
 {
 	if (lt_inc_open(scfg, lt_args_sinc, $3))
-		ERROR("failed to process include");
+		ERROR("failed to process include: \"%s\"", $3);
 }
 
 %%
