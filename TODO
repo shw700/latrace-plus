@@ -24,6 +24,7 @@ bugs
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- * everything should still compile fine without libunwind present
+	- error messages should be sent over pipe
 
 Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
@@ -38,4 +39,4 @@ Other:
 	- TSD should pass temporary heap for quick operations
 	- * Remove transformer call stack (replace with pltexit/inregs?)
 	- replace other invocations of DEMANGLE()
-	- ** vastly improve custom heap efficiency
+	- * vastly improve custom heap efficiency

@@ -13,6 +13,10 @@
 #endif
 
 
+// TODO:	Allocations > 4096b should take multiple pages off page bucket
+// TODO:	Internal allocations should be used
+// TODO:	Get rid of memory leak when downsizing control pages
+
 #define PAGE_SIZE		4096
 #define CHUNK_SIZE(x)		(x+4)
 
@@ -21,6 +25,7 @@
 //#define CTRL_PAGES_PER_BUCKET(ratio,sz)		((((PAGE_PREALLOC_SIZE / ratio ) * (PAGE_SIZE / sz))) / MAX_FREE_CHUNKS_PER_PAGE)
 #define CTRL_PAGES_PER_BUCKET(ratio,sz)		(CEIL((((PAGE_PREALLOC_SIZE / ratio ) * (PAGE_SIZE / sz))), MAX_FREE_CHUNKS_PER_PAGE))
 #define TOTAL_CHUNKS(ratio,sz)			((PAGE_PREALLOC_SIZE / ratio) * (PAGE_SIZE / sz))
+#define BUCKET_IDX_TO_SIZE(idx)			(16 << idx)
 
 
 static int _bucket_init = 0;
@@ -39,6 +44,11 @@ typedef struct safe_chunk_hdr {
 } __attribute__((packed)) safe_chunk_hdr_t;
 
 
+typedef struct safe_chunk_bucket {
+	safe_free_chunk_list_t *head;
+	pthread_mutex_t lock;
+	size_t ratio;
+} safe_chunk_bucket_t;
 
 /*
  * Buckets:
@@ -63,13 +73,24 @@ typedef struct safe_chunk_hdr {
 #define CHUNK_BUCKET_6_RATIO	32
 #define CHUNK_BUCKET_7_RATIO	32
 #define CHUNK_BUCKET_8_RATIO	32
-// Bucket is the remainder
+// Page-sized bucket is the remainder
+
+safe_chunk_bucket_t free_chunk_buckets[N_CHUNK_BUCKETS] =
+{
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_1_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_2_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_3_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_4_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_5_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_6_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_7_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, CHUNK_BUCKET_8_RATIO },
+	{ NULL, PTHREAD_MUTEX_INITIALIZER, 0 },
+};
+
 
 // Preallocate 4MB
 #define PAGE_PREALLOC_SIZE	1024
-
-static safe_free_chunk_list_t *free_chunk_buckets[N_CHUNK_BUCKETS];
-static pthread_mutex_t bucket_locks[N_CHUNK_BUCKETS];
 
 
 int glibc_unsafe = 0;
@@ -103,131 +124,16 @@ _allocate_pages(size_t n) {
 	return result;
 }
 
-int
-_add_bucket_free_chunk(safe_free_chunk_list_t *flist, safe_chunk_hdr_t *chunk) {
-	safe_free_chunk_list_t *fnew;
-	ssize_t i;
-
-	/* Seek to the very last chunk */
-	while (flist->next)
-		flist = flist->next;
-
-	/* If we're full we need a new control page */
-	if (flist->free_chunks[MAX_FREE_CHUNKS_PER_PAGE-1]) {
-		fnew = _allocate_pages(1);
-		if (!fnew)
-			return -1;
-
-		memset(fnew, 0, PAGE_SIZE);
-		fnew->prev = flist;
-		flist->next = fnew;
-		fnew->free_chunks[0] = chunk;
-		fnew->free_chunks[1] = NULL;
-		return 0;
-	}
-
-	/* And then find the last used chunk going backwards */
-	for (i = MAX_FREE_CHUNKS_PER_PAGE-2; i >= 0; i--) {
-
-		if (flist->free_chunks[i]) {
-			// There's still room, add it to this page.
-			flist->free_chunks[i+1] = chunk;
-			break;
-		}
-
-	}
-
-	return 0;
-}
-
 void *
-_get_bucket_free_chunk(safe_free_chunk_list_t *flist) {
-	void *result = NULL;
-	safe_free_chunk_list_t *prevlist = NULL;
-	ssize_t i;
+_allocate_pages_internal(size_t n) {
+	void *result;
 
-	/* Seek to the very last chunk */
-	while (flist->next) {
-		prevlist = flist;
-		flist = flist->next;
+	if ((result = mmap(NULL, (PAGE_SIZE*n), PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
+		PERROR("mmap");
+		return NULL;
 	}
-
-	/* And then find the last used chunk going backwards */
-	for (i = MAX_FREE_CHUNKS_PER_PAGE-1; i >= 0; i--) {
-
-		if (flist->free_chunks[i]) {
-			result = flist->free_chunks[i];
-			flist->free_chunks[i] = NULL;
-			break;
-		}
-
-	}
-
-	/* If we hit the end, we need to unlink this control page */
-	// XXX: Here lies a memory leak.
-	// XXX: We need to toss this page into the free 4096 (page-sized) free list.
-	if ((i == 0) && prevlist)
-		prevlist->next = NULL;
 
 	return result;
-}
-
-size_t
-_get_bucket_by_reqsize(size_t nbytes) {
-	size_t i;
-	size_t real_size = nbytes + sizeof(safe_chunk_hdr_t);
-
-	for (i = 0; i < N_CHUNK_BUCKETS; i++) {
-		size_t bucket_max = (16 << i);
-
-		if (real_size <= bucket_max)
-			return i;
-
-	}
-
-	return N_CHUNK_BUCKETS;
-}
-
-void
-_dump_all_buckets(void) {
-	size_t b;
-
-	fprintf(stderr, "Looking through: %d buckets\n", N_CHUNK_BUCKETS);
-
-	for (b = 0; b < N_CHUNK_BUCKETS; b++) {
-		safe_free_chunk_list_t *head, *fptr;
-		size_t count = 0, entries = 0;
-
-		fprintf(stderr, "B %.4d: %p\n", (16 << b), free_chunk_buckets[b]);
-
-		fptr = head = free_chunk_buckets[b];
-		fprintf(stderr, "FIRST: %p, ", head->free_chunks[0]);
-
-		while (fptr) {
-			size_t i;
-
-			count++;
-
-			for (i = 0; i < MAX_FREE_CHUNKS_PER_PAGE; i++) {
-
-				if (!fptr->free_chunks[i]) {
-					fprintf(stderr, "last: %p\n", fptr->free_chunks[i-1]);
-					break;
-				}
-
-				entries++;
-			}
-
-			if (i != MAX_FREE_CHUNKS_PER_PAGE)
-				break;
-
-			fptr = fptr->next;
-		}
-
-		fprintf(stderr, "   total ctrl pages = %zu; entries = %zu\n", count, entries);
-	}
-
-	return;
 }
 
 int
@@ -274,6 +180,165 @@ _carve_chunks(safe_free_chunk_list_t *head, size_t chunk_size, size_t total_chun
 	return 0;
 }
 
+int
+_add_bucket_free_chunk(safe_free_chunk_list_t *flist, safe_chunk_hdr_t *chunk) {
+	safe_free_chunk_list_t *fnew;
+	ssize_t i;
+
+	/* Seek to the very last chunk */
+	while (flist->next)
+		flist = flist->next;
+
+	/* If we're full we need a new control page */
+	if (flist->free_chunks[MAX_FREE_CHUNKS_PER_PAGE-1]) {
+		fnew = _allocate_pages(1);
+		if (!fnew)
+			return -1;
+
+		memset(fnew, 0, PAGE_SIZE);
+		fnew->prev = flist;
+		flist->next = fnew;
+		fnew->free_chunks[0] = chunk;
+		fnew->free_chunks[1] = NULL;
+		return 0;
+	}
+
+	/* And then find the last used chunk going backwards */
+	for (i = MAX_FREE_CHUNKS_PER_PAGE-2; i >= 0; i--) {
+
+		if (flist->free_chunks[i]) {
+			// There's still room, add it to this page.
+			flist->free_chunks[i+1] = chunk;
+			break;
+		}
+
+	}
+
+	return 0;
+}
+
+void *
+_get_bucket_free_chunk(size_t bucket_idx) {
+	void *result = NULL;
+	safe_free_chunk_list_t *flist, *fptr, *prevlist = NULL;
+	ssize_t i;
+
+	fptr = flist = free_chunk_buckets[bucket_idx].head;
+
+	/* Seek to the very last chunk */
+	while (fptr->next) {
+		prevlist = fptr;
+		fptr = fptr->next;
+	}
+
+	/* If nothing is free we need to allocate more */
+	if ((fptr == flist) && !(flist->free_chunks[0])) {
+		safe_free_chunk_list_t *nextp;
+		void *nmem;
+		size_t npages, bucket_sz;
+
+		bucket_sz = BUCKET_IDX_TO_SIZE(bucket_idx);
+		/* Allocate the control pages and the pages themselves */
+		npages = CTRL_PAGES_PER_BUCKET(free_chunk_buckets[bucket_idx].ratio, bucket_sz);
+		npages += (PAGE_PREALLOC_SIZE / free_chunk_buckets[bucket_idx].ratio);
+		nmem = _allocate_pages(npages);
+		fptr = free_chunk_buckets[bucket_idx].head = (safe_free_chunk_list_t *)nmem;
+		_carve_chunks(nmem, bucket_sz, TOTAL_CHUNKS(free_chunk_buckets[bucket_idx].ratio, bucket_sz), &nextp);
+
+		// Redo what we should have done above.
+		while (fptr->next) {
+			prevlist = fptr;
+			fptr = fptr->next;
+		}
+
+	}
+
+	/* And then find the last used chunk going backwards */
+	for (i = MAX_FREE_CHUNKS_PER_PAGE-1; i >= 0; i--) {
+
+		if (fptr->free_chunks[i]) {
+			result = fptr->free_chunks[i];
+			fptr->free_chunks[i] = NULL;
+			break;
+		}
+
+	}
+
+	/* If we hit the end, we need to unlink this control page */
+	// XXX: Here lies a memory leak.
+	// XXX: We need to toss this page into the free 4096 (page-sized) free list.
+	if ((i == 0) && prevlist)
+		prevlist->next = NULL;
+
+	return result;
+}
+
+size_t
+_get_bucket_by_reqsize(size_t nbytes, size_t *bucket_sz) {
+	size_t i;
+	size_t real_size = nbytes + sizeof(safe_chunk_hdr_t);
+
+	for (i = 0; i < N_CHUNK_BUCKETS; i++) {
+		size_t bucket_max = BUCKET_IDX_TO_SIZE(i);
+
+		if (real_size <= bucket_max) {
+
+			if (bucket_sz)
+				*bucket_sz = bucket_max;
+
+			return i;
+		}
+
+	}
+
+	if (bucket_sz)
+		*bucket_sz = PAGE_SIZE;
+
+	return N_CHUNK_BUCKETS;
+}
+
+void
+_dump_all_buckets(void) {
+	size_t b;
+
+	fprintf(stderr, "Looking through: %d buckets\n", N_CHUNK_BUCKETS);
+
+	for (b = 0; b < N_CHUNK_BUCKETS; b++) {
+		safe_free_chunk_list_t *head, *fptr;
+		size_t count = 0, entries = 0;
+
+		fprintf(stderr, "B %.4d: %p\n", BUCKET_IDX_TO_SIZE(b), free_chunk_buckets[b].head);
+
+		fptr = head = free_chunk_buckets[b].head;
+		fprintf(stderr, "FIRST: %p, ", head->free_chunks[0]);
+
+		while (fptr) {
+			size_t i;
+
+			count++;
+
+			for (i = 0; i < MAX_FREE_CHUNKS_PER_PAGE; i++) {
+
+				if (!fptr->free_chunks[i]) {
+					fprintf(stderr, "last: %p\n", fptr->free_chunks[i-1]);
+					break;
+				}
+
+				entries++;
+			}
+
+			if (i != MAX_FREE_CHUNKS_PER_PAGE)
+				break;
+
+			fptr = fptr->next;
+		}
+
+		fprintf(stderr, "   total ctrl pages = %zu; entries = %zu\n", count, entries);
+	}
+
+	return;
+}
+
 void
 _prepare_free_chunks(void) {
 	void *all_init_chunks;
@@ -290,63 +355,33 @@ _prepare_free_chunks(void) {
 		(PAGE_PREALLOC_SIZE / CHUNK_BUCKET_5_RATIO) + (PAGE_PREALLOC_SIZE / CHUNK_BUCKET_6_RATIO) +
 		(PAGE_PREALLOC_SIZE / CHUNK_BUCKET_7_RATIO) + (PAGE_PREALLOC_SIZE / CHUNK_BUCKET_8_RATIO));
 
-	ctrl_page_ct[0] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_1_RATIO, 16);
-	ctrl_page_ct[1] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_2_RATIO, 32);
-	ctrl_page_ct[2] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_3_RATIO, 64);
-	ctrl_page_ct[3] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_4_RATIO, 128);
-	ctrl_page_ct[4] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_5_RATIO, 256);
-	ctrl_page_ct[5] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_6_RATIO, 512);
-	ctrl_page_ct[6] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_7_RATIO, 1024);
-	ctrl_page_ct[7] = CTRL_PAGES_PER_BUCKET(CHUNK_BUCKET_8_RATIO, 2048);
-	ctrl_page_ct[8] = CEIL(leftover_pages, MAX_FREE_CHUNKS_PER_PAGE);
-
-	for (i = 0; i < N_CHUNK_BUCKETS; i++)
+	for (i = 0; i < N_CHUNK_BUCKETS-1; i++) {
+		ctrl_page_ct[i] = CTRL_PAGES_PER_BUCKET(free_chunk_buckets[i].ratio, BUCKET_IDX_TO_SIZE(i));
 		pages_required += ctrl_page_ct[i];
+	}
+
+	ctrl_page_ct[N_CHUNK_BUCKETS-1] = CEIL(leftover_pages, MAX_FREE_CHUNKS_PER_PAGE);
+	pages_required += ctrl_page_ct[N_CHUNK_BUCKETS-1];
 
 	safe_free_chunk_list_t *nextp = NULL;
-	all_init_chunks = _allocate_pages(pages_required);
+	all_init_chunks = nextp = _allocate_pages(pages_required);
 
-	free_chunk_buckets[0] = all_init_chunks;
-	_carve_chunks(all_init_chunks, 16,   TOTAL_CHUNKS(CHUNK_BUCKET_1_RATIO, 16), &nextp);
+	for (i = 0; i < N_CHUNK_BUCKETS-1; i++) {
+		free_chunk_buckets[i].head = nextp;
+		_carve_chunks(nextp, BUCKET_IDX_TO_SIZE(i), TOTAL_CHUNKS(free_chunk_buckets[i].ratio, BUCKET_IDX_TO_SIZE(i)), &nextp);
+	}
 
-	free_chunk_buckets[1] = nextp;
-	_carve_chunks(nextp, 32,   TOTAL_CHUNKS(CHUNK_BUCKET_2_RATIO, 32), &nextp);
-
-	free_chunk_buckets[2] = nextp;
-	_carve_chunks(nextp, 64,   TOTAL_CHUNKS(CHUNK_BUCKET_3_RATIO, 64), &nextp);
-
-	free_chunk_buckets[3] = nextp;
-	_carve_chunks(nextp, 128,  TOTAL_CHUNKS(CHUNK_BUCKET_4_RATIO, 128), &nextp);
-
-	free_chunk_buckets[4] = nextp;
-	_carve_chunks(nextp, 256,  TOTAL_CHUNKS(CHUNK_BUCKET_5_RATIO, 256), &nextp);
-
-	free_chunk_buckets[5] = nextp;
-	_carve_chunks(nextp, 512,  TOTAL_CHUNKS(CHUNK_BUCKET_6_RATIO, 512), &nextp);
-
-	free_chunk_buckets[6] = nextp;
-	_carve_chunks(nextp, 1024, TOTAL_CHUNKS(CHUNK_BUCKET_7_RATIO, 1024), &nextp);
-
-	free_chunk_buckets[7] = nextp;
-	_carve_chunks(nextp, 2048, TOTAL_CHUNKS(CHUNK_BUCKET_8_RATIO, 2048), &nextp);
-
-	free_chunk_buckets[8] = nextp;
-	_carve_chunks(nextp, 4096, leftover_pages, &nextp);
+	free_chunk_buckets[N_CHUNK_BUCKETS-1].head = nextp;
+	_carve_chunks(nextp, PAGE_SIZE, leftover_pages, &nextp);
 
 	return;
 }
 
 void
 _initialize_buckets(void) {
-	size_t i;
 
 	if (_bucket_init)
 		return;
-
-	for (i = 0; i < sizeof(bucket_locks)/sizeof(bucket_locks[0]); i++) {
-		if (pthread_mutex_init(&bucket_locks[i], NULL))
-			PERROR("pthread_mutex_init");
-	}
 
 	_prepare_free_chunks();
 	_bucket_init = 1;
@@ -356,21 +391,19 @@ _initialize_buckets(void) {
 
 inline void *
 safe_malloc(size_t size) {
-	safe_free_chunk_list_t *flist;
 	safe_chunk_hdr_t *chdr;
 	void *result = NULL;
-	size_t bucket_idx;
+	size_t bucket_idx, bucket_sz;
 	int flags = 0;
 
 	_initialize_buckets();
 
-	bucket_idx = _get_bucket_by_reqsize(size);
+	bucket_idx = _get_bucket_by_reqsize(size, &bucket_sz);
 
 	if (bucket_idx < N_CHUNK_BUCKETS) {
-		pthread_mutex_lock(&bucket_locks[bucket_idx]);
-		flist = free_chunk_buckets[bucket_idx];
-		result = _get_bucket_free_chunk(flist);
-		pthread_mutex_unlock(&bucket_locks[bucket_idx]);
+		pthread_mutex_lock(&free_chunk_buckets[bucket_idx].lock);
+		result = _get_bucket_free_chunk(bucket_idx);
+		pthread_mutex_unlock(&free_chunk_buckets[bucket_idx].lock);
 	}
 
 	if (!result) {
@@ -383,6 +416,7 @@ safe_malloc(size_t size) {
 		else
 			real_size = (real_size + PAGE_SIZE) & ~(PAGE_SIZE - 1);
 
+		printf("XXX: alloc of %zu resulted in mmap()\n", size);
 		if ((result = mmap(NULL, real_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			PERROR("mmap");
 			return NULL;
@@ -415,15 +449,15 @@ safe_free(void *ptr) {
 		return;
 	}
 
-	bucket_idx = _get_bucket_by_reqsize(chdr->size);
-	pthread_mutex_lock(&bucket_locks[bucket_idx]);
-	flist = free_chunk_buckets[bucket_idx];
+	bucket_idx = _get_bucket_by_reqsize(chdr->size, NULL);
+	pthread_mutex_lock(&free_chunk_buckets[bucket_idx].lock);
+	flist = free_chunk_buckets[bucket_idx].head;
 
 	if (_add_bucket_free_chunk(flist, chdr) != 0) {
 		PRINT_ERROR("%s", "Error: safe allocator could not dispose of free chunk\n");
 	}
 
-	pthread_mutex_unlock(&bucket_locks[bucket_idx]);
+	pthread_mutex_unlock(&free_chunk_buckets[bucket_idx].lock);
 	return;
 }
 
