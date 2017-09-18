@@ -273,8 +273,8 @@ lookup_addr(void *addr) {
 int
 get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int debug) {
 	symbol_mapping_t *result, *rptr;
-	Elf64_Dyn *dyn = (Elf64_Dyn *)lm->l_ld;
-	Elf64_Sym *symtab = NULL;
+	ELF_DYN *dyn = (ELF_DYN *)lm->l_ld;
+	ELF_SYM *symtab = NULL;
 	void *osym = NULL;
 	char *strtab = NULL, *rstrtab;
 	size_t strtab_size = 0, syment_size = 0, rsize = 0, nsyms = 0;
@@ -291,7 +291,7 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 		else if (dyn->d_tag == DT_STRTAB)
 			strtab = (void *)dyn->d_un.d_ptr;
 		else if (dyn->d_tag == DT_SYMTAB)
-			osym = symtab = (Elf64_Sym *)dyn->d_un.d_ptr;
+			osym = symtab = (ELF_SYM *)dyn->d_un.d_ptr;
 
 		if (debug) {
 			if (dyn->d_tag == DT_RELENT)
@@ -328,10 +328,10 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 			continue;
 		}
 
-		if ((ELF64_ST_TYPE(symtab->st_info) == STT_OBJECT) || (ELF64_ST_TYPE(symtab->st_info) == STT_TLS))
+		if ((ELF_ST_TYPE(symtab->st_info) == STT_OBJECT) || (ELF_ST_TYPE(symtab->st_info) == STT_TLS))
 			add_address_mapping((void *)symtab->st_value+lm->l_addr, symtab->st_size, strtab+symtab->st_name);
 
-		if (ELF64_ST_TYPE(symtab->st_info) != STT_FUNC) {
+		if (ELF_ST_TYPE(symtab->st_info) != STT_FUNC) {
 			symtab++;
 			continue;
 		}
@@ -352,7 +352,7 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 	rstrtab = (char *)result + rsize - strtab_size;
 	memcpy(rstrtab, strtab, strtab_size);
 
-	symtab = (Elf64_Sym *)osym;
+	symtab = (ELF_SYM *)osym;
 	rptr = result;
 
 	while (1) {
@@ -365,13 +365,13 @@ get_all_symbols(struct link_map *lm, symbol_mapping_t **pmap, size_t *msize, int
 			continue;
 		}
 
-		if (ELF64_ST_TYPE(symtab->st_info) != STT_FUNC) {
+		if (ELF_ST_TYPE(symtab->st_info) != STT_FUNC) {
 			symtab++;
 			continue;
 		}
 
-		if (ELF64_ST_TYPE(symtab->st_info) != STT_FUNC) {
-//			fprintf(stderr, "XXX: %s / %d\n", rstrtab+symtab->st_name, ELF64_ST_TYPE(symtab->st_info));
+		if (ELF_ST_TYPE(symtab->st_info) != STT_FUNC) {
+//			fprintf(stderr, "XXX: %s / %d\n", rstrtab+symtab->st_name, ELF_ST_TYPE(symtab->st_info));
 		}
 
 		rptr->addr = (unsigned long)lm->l_addr + symtab->st_value;

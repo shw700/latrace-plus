@@ -529,15 +529,19 @@ do { \
 					fsync(STDERR_FILENO); } while (0)
 #define PERROR(func)	do {	\
 				char errbuf[256];	\
-				PRINT_ERROR("%s: %s", func, strerror_r(errno, errbuf, sizeof(errbuf)));	\
+				memset(errbuf, 0, sizeof(errbuf));	\
+				if (strerror_r(errno, errbuf, sizeof(errbuf))) { }	\
+				PRINT_ERROR("%s: %s", func, errbuf);	\
 			} while (0)
 #define PERROR_PRINTF(fmt,...)	do {	\
-						char msgbuf[256], errbuf[256];	\
+						char msgbuf[256];	\
 						ssize_t max = sizeof(msgbuf);	\
 						memset(msgbuf, 0, sizeof(msgbuf));	\
 						max -= snprintf(msgbuf, sizeof(msgbuf), fmt, __VA_ARGS__);	\
 						if (max > 3) {	\
-							strerror_r(errno, errbuf, sizeof(errbuf));	\
+							char errbuf[256];	\
+							memset(errbuf, 0, sizeof(errbuf));	\
+							if (strerror_r(errno, errbuf, sizeof(errbuf))) { }	\
 							snprintf(&msgbuf[strlen(msgbuf)], max, ": %s\n", errbuf);	\
 							if (write(STDERR_FILENO, msgbuf, strlen(msgbuf))) { }	\
 							fsync(STDERR_FILENO);	\
@@ -617,6 +621,18 @@ extern int _safe_demangle(const char *symname, char *buf, size_t bufsize);
 
 
 #define ANON_PREFIX	"_anon_"
+
+
+#if __WORDSIZE == 64
+#define ELF_DYN		Elf64_Dyn
+#define ELF_SYM		Elf64_Sym
+#define ELF_ST_TYPE	ELF64_ST_TYPE
+#else
+#define ELF_DYN		Elf32_Dyn
+#define ELF_SYM		Elf32_Sym
+#define ELF_ST_TYPE	ELF32_ST_TYPE
+#endif
+
 
 
 #if defined(__x86_64)

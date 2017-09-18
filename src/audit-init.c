@@ -283,8 +283,8 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 
 	for (i = 0; i < rglob.gl_pathc; i++) {
 		struct link_map *lmap = NULL;
-		Elf64_Dyn *dyn;
-		Elf64_Sym *symtab = NULL;
+		ELF_DYN *dyn;
+		ELF_SYM *symtab = NULL;
 		void *handle;
 		char *lpath = rglob.gl_pathv[i], *strtab = NULL, *symstr;
 		size_t symtab_size, strtab_size, sym_count = 0;
@@ -302,18 +302,18 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 			continue;
 		}
 
-		dyn = (Elf64_Dyn *) lmap->l_ld;
+		dyn = (ELF_DYN *) lmap->l_ld;
 
 		while (dyn->d_tag != DT_NULL) {
 
 			if (dyn->d_tag == DT_SYMTAB) {
-				symtab = (Elf64_Sym *)dyn->d_un.d_ptr;
+				symtab = (ELF_SYM *)dyn->d_un.d_ptr;
 				PRINT_VERBOSE(cfg, 2, "Symtab of %s found at %p\n", lpath, (void *)dyn->d_un.d_ptr);
 			} else if (dyn->d_tag == DT_SYMENT) {
 				PRINT_VERBOSE(cfg, 3, "Determined syment size of transformer lib %s: %lu\n", lpath, dyn->d_un.d_val);
 
-				if (dyn->d_un.d_val != sizeof(Elf64_Sym)) {
-					PRINT_ERROR("Unexpected ELF object symbol table entry size was %lu bytes vs %zu\n", dyn->d_un.d_val, sizeof(Elf64_Sym));
+				if (dyn->d_un.d_val != sizeof(ELF_SYM)) {
+					PRINT_ERROR("Unexpected ELF object symbol table entry size was %lu bytes vs %zu\n", dyn->d_un.d_val, sizeof(ELF_SYM));
 					dlclose(handle);
 					continue;
 				}
@@ -344,7 +344,7 @@ int init_custom_handlers(struct lt_config_audit *cfg)
 			if (symtab->st_name >= strtab_size)
 				break;
 
-			if (ELF64_ST_TYPE(symtab->st_info) == STT_FUNC) {
+			if (ELF_ST_TYPE(symtab->st_info) == STT_FUNC) {
 				symstr = strtab + symtab->st_name;
 				PRINT_VERBOSE(cfg, 3, "Found exported function in %s: %s @ %p\n", lpath, symstr, (void *)symtab->st_value);
 
