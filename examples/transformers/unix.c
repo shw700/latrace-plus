@@ -110,7 +110,7 @@ latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t blen)
 	if (sig_tot == _NSIG-1)
 		strcpy(sigbuf, "ALL SIGNALS");
 	else if (!sig_tot)
-		strcpy(sigbuf, "EMPTY");
+		strcpy(sigbuf, "");
 	else {
 
 		for (s = 1; s < _NSIG; s++) {

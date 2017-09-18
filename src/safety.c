@@ -3,7 +3,9 @@
 
 #include "config.h"
 
+#ifdef CONFIG_LIBERTY
 #include <libiberty/demangle.h>
+#endif
 
 #ifdef USE_LIBUNWIND
 #define UNW_LOCAL_ONLY
@@ -580,6 +582,7 @@ _print_backtrace(void) {
 }
 
 
+#ifdef CONFIG_LIBERTY
 typedef struct demangle_buffer {
 	char *buffer;
 	size_t bufsize;
@@ -613,3 +616,11 @@ _safe_demangle(const char *symname, char *buf, size_t bufsize) {
 	ret = cplus_demangle_v3_callback(symname, 0, _safe_demangle_cb, &dmbuf);
 	return ret;
 }
+#else
+int
+_safe_demangle(const char *symname, char *buf, size_t bufsize) {
+	strncpy(buf, symname, bufsize);
+	return 0;
+}
+#endif
+
