@@ -101,11 +101,9 @@ add_address_mapping(void *symaddr, size_t size, const char *name) {
 
 	if (!addr_mapping_size) {
 		addr_mapping_size = 128;
-//		XMALLOC_ASSIGN(addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
 		addr_mappings = safe_malloc(sizeof(*addr_mappings) * addr_mapping_size);
 	} else if (addr_mapping_used == addr_mapping_size) {
 		addr_mapping_size *= 2;
-//		XREALLOC_ASSIGN(addr_mappings, addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
 		addr_mappings = safe_realloc(addr_mappings, (sizeof(*addr_mappings) * addr_mapping_size));
 	}
 

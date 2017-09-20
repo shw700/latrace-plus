@@ -16,7 +16,6 @@ for 0.5.12
 bugs
 	- make waiting for child exit more robust (suspend/continue...)
 	- library settings does not work properly
-	- testing, segfaults with skype (test with simple LD_AUDIT lib)
 	- test statistics counts
 	- fifo reading more intelligent
 	- detailed arguments buffer memory management (now fixed size)
@@ -24,7 +23,7 @@ bugs
 	- consolidate leveled VERBOSE output 
 	- info doc (produce html, pdf... outputs)
 	- * everything should still compile fine without libunwind present
-	- error messages should be sent over pipe
+	- * error messages should be sent over pipe
 
 Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
@@ -35,7 +34,8 @@ Other:
 	- Should probably reap old thread_buffers to prevent memory leakage (and fix efficiency bug)
 	- ** add non-collapsible functions (_setjmp)
 	- * tersely collapsed functions should not display nested functions of bare/fully collapsed functions
-	- TSD should pass temporary heap for quick operations
+	- TSD should pass temporary heap for quick operations?
 	- * Remove transformer call stack (replace with pltexit/inregs?)
 	- replace other invocations of DEMANGLE()
 	- * vastly improve custom heap efficiency
+	- * transformer modules need methods for generating errors/warnings/info

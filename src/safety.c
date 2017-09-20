@@ -418,7 +418,7 @@ safe_malloc(size_t size) {
 		else
 			real_size = (real_size + PAGE_SIZE) & ~(PAGE_SIZE - 1);
 
-		printf("XXX: alloc of %zu resulted in mmap()\n", size);
+//		printf("XXX: alloc of %zu resulted in mmap()\n", size);
 		if ((result = mmap(NULL, real_size, PROT_READ|PROT_WRITE, MAP_ANONYMOUS|MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 			PERROR("mmap");
 			return NULL;
