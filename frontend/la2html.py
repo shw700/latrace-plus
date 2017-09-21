@@ -4,6 +4,76 @@ import sys
 import re
 
 
+def enstyle_parameters(s):
+	result = ""
+
+	if s == "" or s == "void":
+		return "<b>void</b>"
+
+	nexti = s.find("=")
+
+	while (nexti != -1):
+		argname = s[:nexti-1].strip()
+		result += "<b>{}</b> = ".format(argname)
+		remainder = s[nexti+1:].strip()
+
+		if remainder.startswith('"'):
+			endstr = remainder[1:].find('"')
+			if endstr == -1:
+				result += "[decoding error]"
+				return result
+
+			value = '"<i>{}</i>"'.format(remainder[1:endstr+1])
+			s = remainder[endstr+2:]
+			result += value
+			nexti = s.find("=")
+			continue
+		else:
+			endval = remainder.find(",")
+
+			if endval == -1:
+				value = remainder
+				s = ""
+			else:
+				value = remainder[0:endval]
+				s = remainder[endval:]
+
+		isDigit = False
+
+		try:
+			int(value)
+			isDigit = True
+		except:
+			try:
+				int(value, 16)
+				isDigit = True
+			except:
+				pass
+
+		if value == "true" or value == "false" or value == "NULL":
+			result += "<b>{}</b>".format(value)
+		elif value.startswith("fn@"):
+			result += '<b>fn@ </b><p style="color:green" class="narrow_p">{}</p>'.format(value[3:])
+		elif not isDigit:
+			pind = value.find("+")
+			if pind != -1:
+				result += '<p style="color:brown" class="narrow_p">{}</p>'.format(value[0:pind])
+				result += "<b>+</b>{}".format(value[pind+1:])
+			else:
+				result += '<p style="color:brown" class="narrow_p">{}</p>'.format(value)
+		elif not value.startswith('"'):
+			result += '<p style="color:blue" class="narrow_p">{}</p>'.format(value)
+		else:
+			result += value
+
+		if s.startswith(","):
+			result += "<b>,</b> "
+			s = s[1:]
+
+		nexti = s.find("=")
+
+	return result
+
 def get_indent(line):
 	count = 0
 
@@ -75,23 +145,29 @@ def emit_html_header():
 	h += "});"
 	h += "</script>"
 	h += "<style>"
+	h += "html *"
+	h += "{"
+	h += "	font-size: 1em !important;"
+	h += "	font-family: Arial !important;"
+	h += "}"
 	h += ".func_call { padding-left: 2px; padding-top: 5px; padding-bottom: 5px; margin-bottom: 5px; border: 1px dotted black; border-left: 1px dotted black; border-right: none; margin-bottom: 0px; margin-top: 5px; }"
 	h += ".label_src_lib { display: inline-block; cursor: hand; background-color: orange; border: 1px solid black; padding: 3px; font-size: 75%; float: right; }"
 	h += ".label_dst_lib { display: inline-block; cursor: hand; background-color: brown; border: 1px solid black; padding: 3px; font-size: 75% }"
-	h += ".label_tid { display: inline-block; cursor: hand; background-color: yellow; border: 1px solid black; padding: 3px; font-size: 75%; }"
+	h += ".label_tid { display: inline-block; cursor: hand; background-color: yellow; border: 1px solid black; padding: 3px; font-size: 75%; font-weight: bold; }"
 	h += ".label_funcname { display: inline-block; cursor: hand; font-weight: bold; border: 1px dotted silver; padding: 3px; padding: 3px; }"
 	h += ".label_fparams { display: inline-block; background-color: silver; padding: 1px; }"
 	h += ".label_remainder { display: inline-block; color: gray; }"
 	h += ".label_result { display: inline-block; background-color: red; border: 1px solid black; padding-left: 10px; padding-right: 10px; margin-left: 5px; font-weight: bold; font-size: 125%; float: right; margin-right: 50px; }"
 	h += ".label_expander { display: inline-block; cursor: hand; background-color: gray; border: 1px solid black; padding: 3px; margin-left: 5px; margin-right: 2px; font-weight: bold; font-size: 75%; }"
 	h += ".label_console { display: inline-block; background-color: black; color: white; padding: 5px; width: 100%; padding-top: 5px; padding-bottom: 5px; }"
-	h += ".side_bar { display: inline-block; margin-right: 10px; width: 150px; }"
+	h += ".side_bar { display: inline-block; margin-right: 10px; width: 200px; }"
 	h += ".func_bar { display: inline-block; margin-right: 10px; width: 50%; }"
 	h += ".func_indent { display: inline-block; background-color: silver; margin-right: 2px; }"
 	h += ".toggle_button { display: inline-block; cursor: hand; margin-left: 3px; margin-right: 3px; margin-bottom: 2px; padding: 3px; }"
 	h += ".toggle_func { margin-left: 2px; margin-right: 2px; margin-bottom: 2px; }"
 	h += ".enabled { background-color: lime; }"
 	h += ".disabled { background-color: red; }"
+	h += ".narrow_p { -webkit-margin-before: 0em; -webkit-margin-after: 0em; display: inline-block; }"
 	h += "</style>"
 	h += "</head>"
 	h += "<body>"
@@ -261,6 +337,8 @@ for line in lines:
 	else:
 		remainder_str = ""
 
+	func_params_str = '<div class="label_fparams">{}</div>'.format(enstyle_parameters(func_params))
+
 	if lib_name == "":
 		lib_name_str = ""
 	else:
@@ -274,7 +352,7 @@ for line in lines:
 			func_name = func_name[1:]
 		div_class = "div_ind_{}".format(indent_level)
 		body += '<div class="{} func_call">'.format(div_class)
-		body += '<div class="side_bar"><div class="label_tid" xtid="{}">{}</div>      {}{}     </div><div class="func_bar">{}<div class="label_funcname" xfunc="{}">{}</div>     (<div class="label_fparams">{}</div>)</div>     {}     {}'.format(tid, tid, prefix, lib_name_str, func_indent, func_name, func_name, func_params, remainder_str, result_str)
+		body += '<div class="side_bar"><div class="label_tid" xtid="{}">{}</div>      {}{}     </div><div class="func_bar">{}<div class="label_funcname" xfunc="{}">{}</div>     ({})</div>     {}     {}'.format(tid, tid, prefix, lib_name_str, func_indent, func_name, func_name, func_params_str, remainder_str, result_str)
 		all_functions.append(func_name)
 		all_functions.sort()
 		if (remainder != "") and (remainder.find(" ") == -1):
