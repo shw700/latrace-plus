@@ -4,6 +4,12 @@ import sys
 import re
 
 
+color_map = [ "silver", "aquamarine", "tan", "skyblue", "plum", "yellowgreen", "moccasin" ]
+
+
+def get_color_level(n):
+	return color_map[n % len(color_map)]
+
 def enstyle_parameters(s):
 	result = ""
 
@@ -49,6 +55,7 @@ def enstyle_parameters(s):
 				isDigit = True
 			except:
 				pass
+
 
 		if value == "true" or value == "false" or value == "NULL":
 			result += "<b>{}</b>".format(value)
@@ -150,11 +157,11 @@ def emit_html_header():
 	h += "	font-size: 1em !important;"
 	h += "	font-family: Arial !important;"
 	h += "}"
-	h += ".func_call { padding-left: 2px; padding-top: 5px; padding-bottom: 5px; margin-bottom: 5px; border: 1px dotted black; border-left: 1px dotted black; border-right: none; margin-bottom: 0px; margin-top: 5px; }"
+	h += ".func_call { padding-left: 0px; padding-top: 5px; padding-bottom: 5px; margin-bottom: 5px; border: 1px dotted black; border-left: 1px dotted black; border-right: none; margin-bottom: 0px; }"
 	h += ".label_src_lib { display: inline-block; cursor: hand; background-color: orange; border: 1px solid black; padding: 3px; font-size: 75%; float: right; }"
 	h += ".label_dst_lib { display: inline-block; cursor: hand; background-color: brown; border: 1px solid black; padding: 3px; font-size: 75% }"
 	h += ".label_tid { display: inline-block; cursor: hand; background-color: yellow; border: 1px solid black; padding: 3px; font-size: 75%; font-weight: bold; }"
-	h += ".label_funcname { display: inline-block; cursor: hand; font-weight: bold; border: 1px dotted silver; padding: 3px; padding: 3px; }"
+	h += ".label_funcname { display: inline-block; cursor: hand; font-weight: bold; border: 1px dotted gray; padding: 3px; padding-left: 5px; padding-right: 5px; }"
 	h += ".label_fparams { display: inline-block; background-color: silver; padding: 1px; }"
 	h += ".label_remainder { display: inline-block; color: gray; }"
 	h += ".label_result { display: inline-block; background-color: red; border: 1px solid black; padding-left: 10px; padding-right: 10px; margin-left: 5px; font-weight: bold; font-size: 125%; float: right; margin-right: 50px; }"
@@ -162,12 +169,13 @@ def emit_html_header():
 	h += ".label_console { display: inline-block; background-color: black; color: white; padding: 5px; width: 100%; padding-top: 5px; padding-bottom: 5px; }"
 	h += ".side_bar { display: inline-block; margin-right: 10px; width: 200px; }"
 	h += ".func_bar { display: inline-block; margin-right: 10px; width: 50%; }"
-	h += ".func_indent { display: inline-block; background-color: silver; margin-right: 2px; }"
+	h += ".func_indent { display: inline-block; background-color: gray; margin-right: 2px; }"
 	h += ".toggle_button { display: inline-block; cursor: hand; margin-left: 3px; margin-right: 3px; margin-bottom: 2px; padding: 3px; }"
 	h += ".toggle_func { margin-left: 2px; margin-right: 2px; margin-bottom: 2px; }"
 	h += ".enabled { background-color: lime; }"
 	h += ".disabled { background-color: red; }"
 	h += ".narrow_p { -webkit-margin-before: 0em; -webkit-margin-after: 0em; display: inline-block; }"
+	h += ".div_ind_0 { padding-left: 4px; }"
 	h += "</style>"
 	h += "</head>"
 	h += "<body>"
@@ -258,6 +266,7 @@ for line in lines:
 
 	if line_no == 0:
 		first_indent = get_indent(line)
+#		header += "FIRST INDENT: ", first_indent
 		
 	line_no += 1
 	indent = get_indent(line)
@@ -266,6 +275,7 @@ for line in lines:
 		if (indent > first_indent):
 			next_indent = indent
 			indent_inc = next_indent - first_indent
+#			body += "NEXT INDENT: {} / {}".format(next_indent, indent_inc)
 
 	if (indent_inc > 0):
 		indent_level = (indent - first_indent) /indent_inc
@@ -345,13 +355,13 @@ for line in lines:
 		lib_name_str = '<div class="label_src_lib" xlib="{}">{}</div>'.format(lib_name, lib_name)
 
 	if lib_name == "" and func_name.startswith("}"):
-		body += '<div class="side_bar"><div class="label_tid" xtid="{}">{}</div>      {}     </div>      <div class="label_result">RESULT of <b>{}</b></div><br>'.format(tid, tid, prefix, func_name[2:])
-		body += "</div>"
+		body += '<div class="side_bar"><div class="label_tid" xtid="{}">{}</div>      {}     </div>      <div class="label_result">[continued] <b>{}</b></div><br>'.format(tid, tid, prefix, func_name[2:])
+		body += "</div></div>"
 	else:
 		if func_name.startswith("["):
 			func_name = func_name[1:]
 		div_class = "div_ind_{}".format(indent_level)
-		body += '<div class="{} func_call">'.format(div_class)
+		body += '<div style="background-color: {};" class="{} func_call">'.format(get_color_level(indent_level), div_class)
 		body += '<div class="side_bar"><div class="label_tid" xtid="{}">{}</div>      {}{}     </div><div class="func_bar">{}<div class="label_funcname" xfunc="{}">{}</div>     ({})</div>     {}     {}'.format(tid, tid, prefix, lib_name_str, func_indent, func_name, func_name, func_params_str, remainder_str, result_str)
 		all_functions.append(func_name)
 		all_functions.sort()
