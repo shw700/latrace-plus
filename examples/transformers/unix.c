@@ -18,6 +18,7 @@ char *(*sym_lookup_bitmask_by_class)(void *ignored, const char *, unsigned long,
 int latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t bufsize);
 int latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t bufsize);
 int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
+int latrace_func_to_str_waitpid(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 
 
 void unix_transformer_init()
@@ -210,4 +211,67 @@ call_lookup_bitmask_by_class(const char *class, unsigned long val, const char *f
 		snprintf(buf, bufsize, "0x%lx", val);
 
 	return;
+}
+
+#define BOOL_TO_STR(x)	((x != 0) ? "true" : "false")
+
+/* Only the return value requires massaging */
+int latrace_func_to_str_waitpid(void **args, size_t argscnt, char *buf, size_t blen, void *retval)
+{
+	char exitbuf[128], sigbuf[128], auxbuf[128];
+	int **status, *retpid;
+
+        if (!retval || (argscnt != 3))
+                return -1;
+
+	retpid = (int *)retval;
+        status = (int **)args[1];
+
+	if (*status == NULL)
+		return -1;
+
+	exitbuf[0] = sigbuf[0] = auxbuf[0] = 0;
+
+	if (WIFEXITED(**status)) {
+		snprintf(exitbuf, sizeof(exitbuf), "EXITED=true/EXITSTATUS=%d ", WEXITSTATUS(**status));
+	} else if (WIFSIGNALED(status)) {
+		const char *signame = get_signal_name(WTERMSIG(**status));
+		char snbuf[32];
+
+		if (!signame) {
+			sprintf(snbuf, "%d", WTERMSIG(**status));
+			signame = snbuf;
+		}
+
+		snprintf(sigbuf, sizeof(sigbuf), "SIGNALED=true/TERMSIG=%s ", signame);
+		#ifdef WCOREDUMP
+			snprintf(&(exitbuf[strlen(exitbuf)], sizeof(exitbuf)-strlen(exitbuf), " WCOREDUMP=%s",
+				BOOL_TO_STR(WCOREDUMP(**status))));
+		#endif
+	}
+
+	if (WIFSTOPPED(**status)) {
+		const char *signame = get_signal_name(WSTOPSIG(**status));
+		char snbuf[32];
+
+		if (!signame) {
+			sprintf(snbuf, "%d", WSTOPSIG(**status));
+			signame = snbuf;
+		}
+
+		snprintf(auxbuf, sizeof(auxbuf), "STOPPED=true/STOPSIG=%s ", signame);
+
+	}
+
+	if (WIFCONTINUED(**status)) {
+		snprintf(&auxbuf[strlen(auxbuf)], sizeof(auxbuf)-strlen(auxbuf), "CONTINUED=true");
+	}
+
+	snprintf(buf, blen, "%d [status=0x%x (%s%s%s)]", *retpid, **status, exitbuf, sigbuf, auxbuf);
+
+	if (buf[strlen(buf)-2] == ' ')
+		strcpy(&buf[strlen(buf)-2], ")");
+
+
+        return 0;
 }

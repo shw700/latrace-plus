@@ -1083,29 +1083,30 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 
 	do {
 		ENTRY e, *ep;
+		int found = 0;
 
-		if ((arg = find_arg(cfg, type, 
+		if ((arg = find_arg(cfg, type,
 			args_def_pod, LT_ARGS_DEF_POD_NUM, create))) {
-
-			if (name) {
-				e.key = (char *)name;
-
-				if (hsearch_r(e, FIND, &ep, &args_func_xfm_tab))
-					arg->latrace_custom_func_transformer = (void *)ep->data;
-
-				if (hsearch_r(e, FIND, &ep, &args_func_intercept_tab))
-					arg->latrace_custom_func_intercept = (void *)ep->data;
-			}
-
-			break;
+			found = 1;
+		} else if ((arg = find_arg(cfg, type,
+			args_def_struct, args_def_struct_cnt, create))) {
+			found = 1;
+		} else if ((arg = find_arg(cfg, type,
+			args_def_typedef, args_def_typedef_cnt, create))) {
+			found = 1;
 		}
 
-		if ((arg = find_arg(cfg, type, 
-			args_def_struct, args_def_struct_cnt, create)))
-			break;
+		if (found && name) {
+			e.key = (char *)name;
 
-		if ((arg = find_arg(cfg, type, 
-			args_def_typedef, args_def_typedef_cnt, create)))
+			if (hsearch_r(e, FIND, &ep, &args_func_xfm_tab))
+				arg->latrace_custom_func_transformer = (void *)ep->data;
+
+			if (hsearch_r(e, FIND, &ep, &args_func_intercept_tab))
+				arg->latrace_custom_func_intercept = (void *)ep->data;
+		}
+
+		if (found)
 			break;
 
 		if (!create)

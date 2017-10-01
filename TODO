@@ -24,6 +24,7 @@ bugs
 	- info doc (produce html, pdf... outputs)
 	- * everything should still compile fine without libunwind present
 	- * error messages should be sent over pipe
+	- enum keyword should be handled properly when present in function prototype
 
 Other:
 	- Support for latrace_custom_struct_transformer only added into x86_64 arch support (and other changes)
@@ -39,3 +40,4 @@ Other:
 	- replace other invocations of DEMANGLE()
 	- * vastly improve custom heap efficiency
 	- * transformer modules need methods for generating errors/warnings/info
+	- * add optional address2string debugging option
