@@ -57,6 +57,7 @@ int *__libc_pthread_init~(unsigned long *ptr, pfn reclaim, const struct pthread_
 /* glibc/ld.so */
 void *_dl_allocate_tls~(void *mem);
 void *_dl_sym~(void *handle, const char *name, void *who);
+int _dl_addr~(const void *address, Dl_info *info, struct link_map **mapp, const ElfWSym **symbolp);
 struct link_map *_dl_find_dso_for_object~(void *addr);
 void **__libc_dl_error_tsd~(void);
 void _dl_get_tls_static_info~(size_t *sizep, size_t *alignp);
@@ -204,4 +205,7 @@ bfd_vma bfd_scan_vma~(const char *string, const char **end, int base);
 bfd_boolean bfd_check_format~(bfd *abfd, bfd_format format);
 
 
-
+/* data searches */
+void *tfind~(const void *key, void **rootp, pfn compar);
+void *tsearch~(const void *key, void **rootp, pfn compar);
+int hsearch_r~(void *item, void *action, ENTRY **retval, struct hsearch_data *htab);

@@ -13,7 +13,7 @@ void*   memrchr(void *s, int c, size_t n);
 char*   strcpy~/p(char *dest/p, const char *src);
 char*   strncpy~(void *dest, char *src, size_t n);
 char*   strcat(void *dest, char *src);
-char*   strncat(void *dest, char *src, size_t n);
+char*   strncat~(void *dest, char *src, size_t n);
 int     strcmp~(char *s1, char *s2);
 int     strncmp~(char *s1, char *s2, size_t n);
 int     strcoll(char *s1, char *s2);

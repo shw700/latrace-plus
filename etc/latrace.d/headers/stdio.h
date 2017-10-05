@@ -41,7 +41,7 @@ int vfprintf(FILE *s, char *format);
 int vprintf(char *format);
 int vsprintf(void *s, char *format);
 int snprintf(void *s, size_t maxlen, char *format);
-int vsnprintf(void *s, size_t maxlen, char *format);
+int vsnprintf~(void *s, size_t maxlen, char *format);
 int vasprintf(void *ptr, char *f);
 int __asprintf(void *ptr, char *fmt);
 int asprintf(void *ptr, char *fmt);
@@ -108,7 +108,7 @@ void clearerr_unlocked(FILE *stream);
 int  feof_unlocked~(FILE *stream);
 int  ferror_unlocked(FILE *stream);
 
-void perror(char *s);
+void perror~(char *s);
 
 int     fileno~(FILE *stream);
 int     fileno_unlocked(FILE *stream);
