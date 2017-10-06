@@ -1144,7 +1144,8 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 		if (arg->en->bitmask)
 			bitmask = enum_name;
 
-		fmt = arg->en->fmt;
+		if (!fmt)
+			fmt = arg->en->fmt;
 	}
 
 	XSTRDUP_ASSIGN(arg->name, name);
