@@ -1,5 +1,18 @@
-
 /* /usr/include/netdb.h */
+
+enum_bm ai_flags {
+	AI_PASSIVE     = 0x0001,
+	AI_CANONNAME   = 0x0002,
+	AI_NUMERICHOST = 0x0004,
+	AI_V4MAPPED    = 0x0008,
+	AI_ALL         = 0x0010,
+	AI_ADDRCONFIG  = 0x0020,
+	AI_IDN         = 0x0040,
+	AI_CANONIDN    = 0x0080,
+	AI_IDN_ALLOW_UNASSIGNED = 0x0100,
+	AI_IDN_USE_STD3_ASCII_RULES = 0x0200,
+	AI_NUMERICSERV = 0x0400,
+};
 
 
 int*    __h_errno_location();

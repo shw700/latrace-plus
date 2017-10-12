@@ -49,6 +49,31 @@ enum SOCK_TYPE {
         SOCK_PACKET     = 10
 };
 
+enum SOCK_PROTOCOL_INET {
+	IPPROTO_IP      = 0,
+	IPPROTO_ICMP    = 1,
+	IPPROTO_IGMP    = 2,
+	IPPROTO_IPIP    = 4,
+	IPPROTO_TCP     = 6,
+	IPPROTO_EGP     = 8,
+	IPPROTO_PUP     = 12,
+	IPPROTO_UDP     = 17,
+	IPPROTO_IDP     = 22,
+	IPPROTO_DCCP    = 33,
+	IPPROTO_RSVP    = 46,
+	IPPROTO_GRE     = 47,
+	IPPROTO_IPV6    = 41,
+	IPPROTO_ESP     = 50,
+	IPPROTO_AH      = 51,
+	IPPROTO_BEETPH  = 94,
+	IPPROTO_PIM     = 103,
+	IPPROTO_COMP    = 108,
+	IPPROTO_SCTP    = 132,
+	IPPROTO_UDPLITE = 136,
+	IPPROTO_RAW     = 255
+};
+
+
 int socket(int domain = PF_TYPE, int type = SOCK_TYPE, int protocol);
 int socketpair(int domain = PF_TYPE, int type = SOCK_TYPE, int protocol, void *fds);
 int bind~(int fd, void *addr, socklen_t len);

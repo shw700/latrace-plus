@@ -362,6 +362,64 @@ struct lt_enum_bm *getenum_bm(struct lt_config_shared *cfg, char *name)
 	return en;
 }
 
+char *lookup_constant_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt, char *outbuf, size_t bufsize) {
+	struct lt_enum_bm *enum_bm;
+	struct lt_enum* _enum = NULL;
+
+	if (!class)
+		goto out;
+
+	if (!cfg)
+		cfg = bm_config;
+
+	memset(outbuf, 0, bufsize);
+
+	enum_bm = getenum_bm(cfg, (char *)class);
+
+	if (!enum_bm)
+		_enum = getenum(cfg, (char *)class);
+
+	if (enum_bm) {
+		size_t i;
+
+		for(i = 0; i < enum_bm->cnt; i++) {
+			struct lt_enum_bm_elem *elem = &enum_bm->elems[i];
+
+			if (elem->val == val) {
+				strncpy(outbuf, elem->name, bufsize);
+				return outbuf;
+			}
+
+		}
+
+	} else if (_enum) {
+		size_t i;
+
+		for(i = 0; i < _enum->cnt; i++) {
+			struct lt_enum_elem *elem = &_enum->elems[i];
+
+			if (elem->val == val) {
+				strncpy(outbuf, elem->name, bufsize);
+				return outbuf;
+			}
+
+		}
+
+	}
+
+out:
+	if (fmt && !strcmp(fmt, "o"))
+		snprintf(outbuf, bufsize, "0%o", (unsigned int)val);
+	else if (fmt && !strcmp(fmt, "d"))
+		snprintf(outbuf, bufsize, "%d", (int)val);
+	else if (fmt && !strcmp(fmt, "u"))
+		snprintf(outbuf, bufsize, "%u", (unsigned int)val);
+	else
+		snprintf(outbuf, bufsize, "0x%x", (unsigned int)val);
+
+	return outbuf;
+}
+
 char *lookup_bitmask_by_class(struct lt_config_shared *cfg, const char *class, unsigned long val, const char *fmt, char *outbuf, size_t bufsize) {
 	unsigned long left = val;
 	struct lt_enum_bm *enum_bm;

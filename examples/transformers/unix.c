@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <dlfcn.h>
 
 
@@ -9,15 +13,18 @@
 void unix_transformer_init() __attribute__((constructor));
 const char *call_lookup_addr(void *addr, char *outbuf, size_t bufsize);
 void call_lookup_bitmask_by_class(const char *class, unsigned long val, const char *fmt, char *buf, size_t bufsize);
+void call_lookup_constant_by_class(const char *class, unsigned long val, const char *fmt, char *buf, size_t bufsize);
 
 
 const char *(*sym_lookup_addr)(void *, char *, size_t) = NULL;
 char *(*sym_lookup_bitmask_by_class)(void *ignored, const char *, unsigned long, const char *, char *, size_t) = NULL;
+char *(*sym_lookup_constant_by_class)(void *ignored, const char *, unsigned long, const char *, char *, size_t) = NULL;
 
 
 int latrace_struct_to_str_sigaction(struct sigaction *obj, char *buf, size_t bufsize);
 int latrace_struct_to_str_sigset_t(sigset_t *obj, char *buf, size_t bufsize);
 int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
+int latrace_func_to_str_getaddrinfo(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 int latrace_func_to_str_waitpid(void **args, size_t argscnt, char *buf, size_t blen, void *retval);
 
 
@@ -27,6 +34,7 @@ void unix_transformer_init()
 
 	sym_lookup_addr = (void *) dlsym(NULL, "lookup_addr");
 	sym_lookup_bitmask_by_class = (void *) dlsym(NULL, "lookup_bitmask_by_class");
+	sym_lookup_constant_by_class = (void *) dlsym(NULL, "lookup_constant_by_class");
 	return;
 }
 
@@ -88,6 +96,82 @@ int latrace_func_to_str_gethostname(void **args, size_t argscnt, char *buf, size
 
 	snprintf(buf, blen, "\"%s\"", *name);
         return 0;
+}
+
+int latrace_func_to_str_getaddrinfo(void **args, size_t argscnt, char *buf, size_t blen, void *retval)
+{
+	struct addrinfo ***ai, *aiptr;
+	struct sockaddr_in *s_in;
+	char ai_family_buf[64], ai_socktype_buf[64], ai_protocol_buf[64], ai_flags_buf[128], ai_addr_buf[32];
+	char *canon;
+	int *retint;
+	size_t aicnt = 0, nleft;
+	int cnt = 0;
+
+        if (!retval || (argscnt != 4))
+                return -1;
+
+        retint = (int *)retval;
+//        node = (char **)args[0];
+ //       service = (char **)args[1];
+        ai = (struct addrinfo ***)args[3];
+
+	if (*retint != 0)
+		return -1;
+
+	if (!*ai || !**ai)
+		return -1;
+
+	aiptr = **ai;
+
+	while (aiptr) {
+		aiptr = aiptr->ai_next;
+		aicnt++;
+	}
+
+	if (!aicnt) {
+		snprintf(buf, blen, "%d (%zu total results)", *retint, aicnt);
+		return 0;
+	}
+
+	snprintf(buf, blen, "%d (%zu total results) { ", *retint, aicnt);
+
+	nleft = blen - strlen(buf);
+	aiptr = **ai;
+
+	while ((nleft > 0) && aiptr) {
+		char *prefix = "";
+		memset(ai_addr_buf, 0, sizeof(ai_addr_buf));
+		s_in = (struct sockaddr_in *)aiptr->ai_addr;
+
+		if (!inet_ntop(s_in->sin_family, aiptr->ai_addr, ai_addr_buf, sizeof(ai_addr_buf))) {
+			snprintf(ai_addr_buf, sizeof(ai_addr_buf), "[unknown addr type(%u bytes)]", aiptr->ai_addrlen);
+		}
+
+		call_lookup_constant_by_class("PF_TYPE", aiptr->ai_family, NULL, ai_family_buf, sizeof(ai_family_buf));
+		call_lookup_constant_by_class("SOCK_TYPE", aiptr->ai_socktype, NULL, ai_socktype_buf, sizeof(ai_socktype_buf));
+
+		if ((aiptr->ai_family == AF_INET) || (aiptr->ai_family == AF_INET6))
+			call_lookup_constant_by_class("SOCK_PROTOCOL_INET", aiptr->ai_protocol, NULL, ai_protocol_buf, sizeof(ai_protocol_buf));
+		else
+			snprintf(ai_protocol_buf, sizeof(ai_protocol_buf), "0x%x", aiptr->ai_protocol);
+
+		call_lookup_bitmask_by_class("ai_flags", aiptr->ai_flags, NULL, ai_flags_buf, sizeof(ai_flags_buf));
+		canon = aiptr->ai_canonname ? aiptr->ai_canonname : "[none]";
+
+		if (cnt)
+			prefix = ",  ";
+
+		snprintf(&(buf[strlen(buf)]), nleft, "%s%d(addr = %s, family = %s, type = %s, protocol = %s, canonical = %s, flags = %s)",
+			prefix, cnt+1, ai_addr_buf, ai_family_buf, ai_socktype_buf, ai_protocol_buf,
+			canon, ai_flags_buf);
+		nleft = blen - strlen(buf);
+		aiptr = aiptr->ai_next;
+		cnt++;
+	}
+
+	snprintf(&(buf[strlen(buf)]), nleft, " }");
+	return 0;
 }
 
 int
@@ -213,6 +297,20 @@ call_lookup_bitmask_by_class(const char *class, unsigned long val, const char *f
 	return;
 }
 
+void
+call_lookup_constant_by_class(const char *class, unsigned long val, const char *fmt, char *buf, size_t bufsize)
+{
+	char *conststr = NULL;
+
+	if (sym_lookup_constant_by_class)
+		conststr = sym_lookup_constant_by_class(NULL, class, val, fmt, buf, bufsize);
+
+	if (!conststr)
+		snprintf(buf, bufsize, "0x%lx", val);
+
+	return;
+}
+
 #define BOOL_TO_STR(x)	((x != 0) ? "true" : "false")
 
 /* Only the return value requires massaging */
@@ -227,7 +325,7 @@ int latrace_func_to_str_waitpid(void **args, size_t argscnt, char *buf, size_t b
 	retpid = (int *)retval;
         status = (int **)args[1];
 
-	if (*status == NULL)
+	if ((*status == NULL) || (*retpid == -1))
 		return -1;
 
 	exitbuf[0] = sigbuf[0] = auxbuf[0] = 0;
