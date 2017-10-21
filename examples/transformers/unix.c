@@ -316,7 +316,7 @@ call_lookup_constant_by_class(const char *class, unsigned long val, const char *
 /* Only the return value requires massaging */
 int latrace_func_to_str_waitpid(void **args, size_t argscnt, char *buf, size_t blen, void *retval)
 {
-	char exitbuf[128], sigbuf[128], auxbuf[128];
+	char exitbuf[128], sigbuf[128], auxbuf[128], *bptr;
 	int **status, *retpid;
 
         if (!retval || (argscnt != 3))
@@ -343,33 +343,48 @@ int latrace_func_to_str_waitpid(void **args, size_t argscnt, char *buf, size_t b
 
 		snprintf(sigbuf, sizeof(sigbuf), "SIGNALED=true/TERMSIG=%s ", signame);
 		#ifdef WCOREDUMP
-			snprintf(&(exitbuf[strlen(exitbuf)], sizeof(exitbuf)-strlen(exitbuf), " WCOREDUMP=%s",
+			snprintf(&(exitbuf[strlen(exitbuf)], sizeof(exitbuf)-strlen(exitbuf), " WCOREDUMP=%s ",
 				BOOL_TO_STR(WCOREDUMP(**status))));
 		#endif
 	}
 
 	if (WIFSTOPPED(**status)) {
-		const char *signame = get_signal_name(WSTOPSIG(**status));
-		char snbuf[32];
+		const char *signame;
+		char snbuf[64];
+		int stopsig, trace_sys_good;
+
+		stopsig = WSTOPSIG(**status);
+		trace_sys_good = stopsig | 0x80;
+		stopsig &= ~(0x80);
+		signame = get_signal_name(stopsig);
 
 		if (!signame) {
-			sprintf(snbuf, "%d", WSTOPSIG(**status));
-			signame = snbuf;
+			if (!trace_sys_good)
+				snprintf(snbuf, sizeof(snbuf), "%d", stopsig);
+			else
+				snprintf(snbuf, sizeof(snbuf), "0x80|%d", stopsig);
+
+		} else {
+			if (!trace_sys_good)
+				snprintf(snbuf, sizeof(snbuf), "%s", signame);
+			else
+				snprintf(snbuf, sizeof(snbuf), "0x80|%s", signame);
 		}
 
-		snprintf(auxbuf, sizeof(auxbuf), "STOPPED=true/STOPSIG=%s ", signame);
-
+		snprintf(auxbuf, sizeof(auxbuf), "STOPPED=true/STOPSIG=%s ", snbuf);
 	}
 
 	if (WIFCONTINUED(**status)) {
 		snprintf(&auxbuf[strlen(auxbuf)], sizeof(auxbuf)-strlen(auxbuf), "CONTINUED=true");
 	}
 
-	snprintf(buf, blen, "%d [status=0x%x (%s%s%s)]", *retpid, **status, exitbuf, sigbuf, auxbuf);
+//	snprintf(buf, blen, "%d [status=0x%x (%s%s%s)]", *retpid, **status, exitbuf, sigbuf, auxbuf);
+	snprintf(buf, blen-2, "%d [status=0x%x (%s%s%s", *retpid, **status, exitbuf, sigbuf, auxbuf);
+	bptr = buf + strlen(buf) - 1;
 
-	if (buf[strlen(buf)-2] == ' ')
-		strcpy(&buf[strlen(buf)-2], ")");
+	while ((bptr > buf) && (*bptr == ' '))
+		*bptr-- = 0;
 
-
+	strcpy(bptr+1, ")]");
         return 0;
 }

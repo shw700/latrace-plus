@@ -143,7 +143,7 @@ STATIC int sym_entry(const char *symname, void *ptr,
 	char *argbuf, *argdbuf = "";
 	struct timeval tv;
 	struct lt_symbol *sym = NULL;
-	int collapsed = 0, set_suppress_collapsed = 0, is_silent = 0;
+	int collapsed = 0, adj_collapse = 0, set_suppress_collapsed = 0, is_silent = 0;
 
 #ifdef USE_GLIBC_FEATURES
 	XMALLOC_ASSIGN(argbuf, LR_ARGS_MAXLEN);
@@ -156,6 +156,40 @@ STATIC int sym_entry(const char *symname, void *ptr,
 	memset(argbuf, 0, LR_ARGS_MAXLEN);
 
 	PRINT_VERBOSE(&cfg, 2, "%s@%s\n", symname, lib_to);
+
+	if ((!strcmp(symname, "siglongjmp") || !strcmp(symname, "longjmp")) &&
+			(tsd->suppress_while[0])) {
+		char warnbuf[512];
+
+		if (lt_sh(&cfg, reset_on_jmp)) {
+			snprintf(warnbuf, sizeof(warnbuf), "--------------------------------------\n"
+				"TID %d caught call to %s(); resetting format state.\n"
+				"--------------------------------------\n",
+				(int)syscall(SYS_gettid), symname);
+			memset(tsd->suppress_while, 0, sizeof(tsd->suppress_while));
+			tsd->suppress_collapsed = COLLAPSED_NONE;
+			tsd->suppress_nested = 0;
+			tsd->nsuppressed = 0;
+			adj_collapse = -2;
+
+			tsd->indent_depth += adj_collapse;
+
+			if (tsd->indent_depth < 0)
+				tsd->indent_depth = 0;
+
+			PRINT_ERROR("%s", warnbuf);
+		} else {
+			snprintf(warnbuf, sizeof(warnbuf), "\n--------------------------------------\n"
+				"WARNING: This program (TID %d) appears to have performed called %s()\n"
+				"Because this occurred during the middle of a collapsed call to %s(),\n"
+				"it is possible that you are missing valuable library output.\n"
+				"To solve this issue, you can try running latrace-plus with -x j.\n"
+				"--------------------------------------\n\n",
+				(int)syscall(SYS_gettid), symname, tsd->suppress_while);
+			PRINT_ERROR("%s", warnbuf);
+		}
+
+	}
 
 	// Make sure we keep track of recursive/repeated calls to ourselves.
 /*	if (tsd->suppress_while[0] && (tsd->suppress_collapsed != COLLAPSED_TERSE)) {
@@ -225,6 +259,9 @@ STATIC int sym_entry(const char *symname, void *ptr,
 		if (tsd->pipe_fd == -1)
 			return -1;
 
+		if (adj_collapse != 0)
+			collapsed = adj_collapse;
+
 		if (tsd->excised) {
 			len = lt_fifo_msym_get(&cfg, buf, FIFO_MSG_TYPE_ENTRY, &tv,
 					"", lib_to, lib_from, tsd->excised, argdbuf, collapsed);
@@ -241,7 +278,6 @@ STATIC int sym_entry(const char *symname, void *ptr,
 
 		if (!is_silent && set_suppress_collapsed)
 			tsd->suppress_collapsed = collapsed;
-
 		return lt_fifo_send(&cfg, tsd->pipe_fd, buf, len);
 	}
 
@@ -356,7 +392,7 @@ STATIC int sym_exit(const char *symname, void *ptr, char *lib_from, char *lib_to
 			symname, lib_to, lib_from,
 			argbuf, argdbuf, &tsd->nsuppressed);
 
-	if (tsd->indent_depth)
+	if (tsd->indent_depth > 0)
 		tsd->indent_depth--;
 
 	free_argbuf(argret, argbuf, argdbuf);

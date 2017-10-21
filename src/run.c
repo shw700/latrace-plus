@@ -131,6 +131,13 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 
 		t->indent_depth++;
 
+		if (msym->collapsed < 0) {
+			t->indent_depth += msym->collapsed;
+
+			if (t->indent_depth < 0)
+				t->indent_depth = 0;
+		}
+
 		/*
 		 * Ugly, but an empty name is how we tweak the call stack depth
 		 * without also doing anything else.
@@ -160,7 +167,7 @@ static int process_fifo(struct lt_config_app *cfg, struct lt_thread *t)
 					&t->nsuppressed);
 		}
 
-		if (t->indent_depth)
+		if (t->indent_depth > 0)
 			t->indent_depth--;
 
 	}

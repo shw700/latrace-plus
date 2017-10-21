@@ -228,6 +228,7 @@ struct lt_config_shared {
 	int lib_short;
 	int src_lib_pfx;
 	int fmt_colors;
+	int reset_on_jmp;
 	int resolve_syms;
 	int counts;
 	int pipe;

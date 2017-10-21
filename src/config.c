@@ -267,6 +267,8 @@ static int process_option_val(struct lt_config_app *cfg, int idx,
 					lt_sh(cfg, src_lib_pfx) = 1;
 				else if (*fopt == 'r')
 					lt_sh(cfg, resolve_syms) = 1;
+				else if (*fopt == 'j')
+					lt_sh(cfg, reset_on_jmp) = 1;
 				else {
 					fprintf(stderr, "Error: formatting option '%c' not supported.\n", *fopt);
 					return -1;

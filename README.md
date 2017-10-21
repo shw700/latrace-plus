@@ -67,6 +67,9 @@ Use of ~ results in terse single line expansion (child function names are displa
 
 `latrace -x l`		Display name of library/module of origin before function call
 
+`latrace -x j`		Reset collapsed function options after (sig)longjmp, which can
+			wreak havoc on the expected call stack state.
+
 
 
 
