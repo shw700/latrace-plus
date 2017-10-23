@@ -1403,7 +1403,7 @@ STATIC char *massage_string(const char *s)
 }
 
 STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *arg,
-				void *pval, char *argbuf, int *arglen)
+				void *pval, char *argbuf, int *arglen, lt_tsd_t *tsd)
 {
 	int len = 0, alen = *arglen;
 	int namelen = strlen(arg->name);
@@ -1673,6 +1673,25 @@ do {                                                                 \
 	}
 
 out:
+	// XXX: The unfortunate thing about this is that it won't work until after the
+	// first time the target references errno. This should be done more robustly.
+	if (pval && arg->fmt && (strchr(arg->fmt, 'e'))) {
+		int intret = *((int *)((uintptr_t)pval));
+
+		if ((intret < 0) && tsd && tsd->errno_loc) {
+			char ebuf[64], errno_buf[64], errno_name[32], *eptr, *ename;
+			size_t sleft;
+
+			sleft = alen - strlen(argbuf);
+			ename = lookup_constant_by_class(cfg, "errno", *(tsd->errno_loc), "d", errno_name, sizeof(errno_name));
+			memset(errno_buf, 0, sizeof(errno_buf));
+			eptr = strerror_r(*(tsd->errno_loc), errno_buf, sizeof(errno_buf));
+
+			snprintf(ebuf, sizeof(ebuf), " (%s: %s)", ename, eptr);
+			strncat(argbuf, ebuf, sleft);
+		}
+	}
+
 	*arglen += strlen(argbuf);
 
 	PRINT_VERBOSE(cfg, 1, "\t arg out len %d - [%s]\n",
@@ -1681,7 +1700,7 @@ out:
 }
 
 int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg, void *pval, 
-		   struct lt_args_data *data, int last, int dspname)
+		   struct lt_args_data *data, int last, int dspname, lt_tsd_t *tsd)
 {
 	int len = data->arglen;
 
@@ -1689,7 +1708,7 @@ int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg, void *pval,
 				arg->type_name, arg->name, pval, last);
 
 	getstr_pod(cfg, dspname, arg, pval, 
-			data->args_buf + data->args_totlen, &len);
+			data->args_buf + data->args_totlen, &len, tsd);
 	data->args_totlen += len;
 
 	if (!last) {
@@ -1711,7 +1730,7 @@ int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg, void *pval,
 }
 
 int lt_args_cb_struct(struct lt_config_shared *cfg, int type, struct lt_arg *arg, 
-		      void *pval, struct lt_args_data *data, int last)
+		      void *pval, struct lt_args_data *data, int last, lt_tsd_t *tsd)
 {
 	PRINT_VERBOSE(cfg, 1,
 		"type %d, arg '%s %s', pval %p, last %d, pointer %d\n",
@@ -1730,7 +1749,7 @@ int lt_args_cb_struct(struct lt_config_shared *cfg, int type, struct lt_arg *arg
 
 		int len = cfg->args_detail_maxlen - data->argsd_totlen;
 
-		getstr_pod(cfg, 1, arg, pval, data->argsd_buf + data->argsd_totlen, &len);
+		getstr_pod(cfg, 1, arg, pval, data->argsd_buf + data->argsd_totlen, &len, tsd);
 		data->argsd_totlen += len;
 
 		if (!last) {

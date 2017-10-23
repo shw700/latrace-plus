@@ -503,7 +503,7 @@ STATIC void* get_value(struct lt_config_shared *cfg, struct lt_arg *arg,
 /* Process structure stored completelly in the 
    memory - pointed to by 'pval' arg. */
 STATIC int process_struct_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
-				void *pval, struct lt_args_data *data)
+				void *pval, struct lt_args_data *data, lt_tsd_t *tsd)
 {
 	struct lt_arg *a;
 	int i = 0;
@@ -511,13 +511,13 @@ STATIC int process_struct_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
 	PRINT_VERBOSE(cfg, 2, "for %s - arch = %llx\n",
 			arg->name, ARCH_GET(arg));
 
-	lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ITSELF, arg, NULL, data, 0);
+	lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ITSELF, arg, NULL, data, 0, tsd);
 
 	lt_list_for_each_entry(a, arg->args_head, args_list) {
 		int last = (i + 1) == arg->mmbcnt;
 		void *pv = pval + ARCH_GET_OFFSET(a);
 
-		lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ARG, a, pv, data, last);
+		lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ARG, a, pv, data, last, tsd);
 
 		i++;
 	}
@@ -526,7 +526,7 @@ STATIC int process_struct_mem(struct lt_config_shared *cfg, struct lt_arg *arg,
 }
 
 STATIC int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
-			void *regs, struct lt_args_data *data, int ret)
+			void *regs, struct lt_args_data *data, int ret, lt_tsd_t *tsd)
 {
 	struct lt_arg *a;
 	int i = 0;
@@ -534,7 +534,7 @@ STATIC int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 	PRINT_VERBOSE(cfg, 2, "for %s - arch = %llx\n",
 			arg->name, ARCH_GET(arg));
 
-	lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ITSELF, arg, NULL, data, 0);
+	lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ITSELF, arg, NULL, data, 0, tsd);
 
 	lt_list_for_each_entry(a, arg->args_head, args_list) {
 		int last = (i + 1) == arg->mmbcnt;
@@ -542,7 +542,7 @@ STATIC int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 
 		pval = get_value(cfg, a, regs, ret);
 
-		lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ARG, a, pval, data, last);
+		lt_args_cb_struct(cfg, LT_ARGS_STRUCT_ARG, a, pval, data, last, tsd);
 		i++;
 	}
 
@@ -551,18 +551,18 @@ STATIC int process_struct_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 
 STATIC void process_detailed_struct(struct lt_config_shared *cfg,
 		struct lt_arg *arg, void *pval, struct lt_args_data *data, 
-		void *regs, int ret)
+		void *regs, int ret, lt_tsd_t *tsd)
 {
 	if (arg->pointer)
 		pval = *((void**) pval);
 
 	if (ARCH_GET_FLAG(arg) == ARCH_FLAG_MEM) {
-		process_struct_mem(cfg, arg, pval, data);
+		process_struct_mem(cfg, arg, pval, data, tsd);
 	} else {
 		if (arg->pointer)
-			process_struct_mem(cfg, arg, pval, data);
+			process_struct_mem(cfg, arg, pval, data, tsd);
 		else
-			process_struct_arg(cfg, arg, regs, data, ret);
+			process_struct_arg(cfg, arg, regs, data, ret, tsd);
 	}
 }
 
@@ -809,11 +809,11 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 			continue;
 		}
 
-		lt_args_cb_arg(cfg, arg, pval, data, last, 1);
+		lt_args_cb_arg(cfg, arg, pval, data, last, 1, tsd);
 
 		if ((cfg->args_detailed) && 
 		    (LT_ARGS_DTYPE_STRUCT == arg->dtype))
-			process_detailed_struct(cfg, arg, pval, data, regs, 0);
+			process_detailed_struct(cfg, arg, pval, data, regs, 0, tsd);
 	}
 
 	return 0;
@@ -908,11 +908,11 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 	}
 
-	lt_args_cb_arg(cfg, arg, pval, data, 1, 0);
+	lt_args_cb_arg(cfg, arg, pval, data, 1, 0, tsd);
 
 	if ((cfg->args_detailed) &&
 	    (LT_ARGS_DTYPE_STRUCT == arg->dtype))
-		process_detailed_struct(cfg, arg, pval, data, regs, 0);
+		process_detailed_struct(cfg, arg, pval, data, regs, 0, tsd);
 
 	return 0;
 }

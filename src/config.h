@@ -92,6 +92,8 @@ typedef struct lt_tsd {
 	size_t xfm_call_stack_max;
 	size_t xfm_call_stack_sz;
 
+	int *errno_loc;
+
 	int pipe_fd;
 	int indent_depth;
 	int flow_below_stack;

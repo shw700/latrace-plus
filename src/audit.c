@@ -499,6 +499,12 @@ STATIC unsigned int la_symbind(ElfW(Sym) *sym, const char *symname, lt_tsd_t *ts
 
 	LA_ENTER(CODE_LOC_LA_SYMBIND);
 
+	if (!tsd->errno_loc && (!strcmp(symname, "__errno_location"))) {
+		int *(*fn_errno_loc)(void);
+		fn_errno_loc = (void *)sym->st_value;
+		tsd->errno_loc = fn_errno_loc();
+	}
+
 	/* particular symbols specified, omit all others */
 	if (cfg.symbols_cnt) {
 		flags = LA_SYMB_NOPLTENTER|LA_SYMB_NOPLTEXIT;

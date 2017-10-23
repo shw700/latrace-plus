@@ -4,6 +4,9 @@
 /* miscellaneous typedefs */
 #include "typedefs.h"
 
+/* errno values */
+#include "errno.h"
+
 /* miscellaneous functions */
 #include "misc.h"
 

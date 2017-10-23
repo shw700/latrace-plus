@@ -31,6 +31,8 @@ The "/" switch can be used at the end of a regular function variable declaration
 
 `/p`	Print memory address
 
+`/e`	Display the contents of errno after the value (if val == -1)
+
 
 The "/" switch at the end of a function variable declaration can be used as such, when displayed in conjunction with a bitmasked value:
 

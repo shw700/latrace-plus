@@ -189,10 +189,10 @@ struct lt_arg* lt_args_getarg(struct lt_config_shared *cfg, const char *type,
 				const char *name, int pointer, int create, char *enum_name);
 int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg,
 			void *pval, struct lt_args_data *data, int last,
-			int dspname);
+			int dspname, lt_tsd_t *tsd);
 int lt_args_cb_struct(struct lt_config_shared *cfg, int type,
 			struct lt_arg *arg, void *pval,
-			struct lt_args_data *data, int last);
+			struct lt_args_data *data, int last, lt_tsd_t *tsd);
 
 /* stack handling */
 int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,

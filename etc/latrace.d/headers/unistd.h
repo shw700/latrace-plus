@@ -37,16 +37,15 @@ __off_t   lseek~(int fd, __off_t offset, int whence);
 __off64_t lseek64~(int fd, __off64_t offset, int whence);
 
 
-int    close~(int fd);
-size_t read(int fd, void *buf, size_t nbytes);
-size_t write(int fd, void *buf, size_t n);
-size_t pread(int fd, void *buf, size_t nbytes, __off_t offset);
-size_t pwrite(int fd, void *buf, size_t n, __off_t offset);
-size_t pread64(int fd, void *buf, size_t nbytes, __off64_t offset);
-size_t pwrite64(int fd, void *buf, size_t n, __off64_t offset);
+int close~(int fd);
+ssize_t read(int fd, void *buf, size_t nbytes);
+ssize_t write/e(int fd, void *buf, size_t n);
+ssize_t pread(int fd, void *buf, size_t nbytes, __off_t offset);
+ssize_t pwrite(int fd, void *buf, size_t n, __off_t offset);
+ssize_t pread64(int fd, void *buf, size_t nbytes, __off64_t offset);
+ssize_t pwrite64(int fd, void *buf, size_t n, __off64_t offset);
 
-
-int   pipe(void *pipe);
+int pipe(void *pipe);
 u_int alarm(u_int seconds);
 u_int sleep(u_int seconds);
 u_int ualarm(u_int __value, u_int interval);
