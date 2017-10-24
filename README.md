@@ -33,6 +33,10 @@ The "/" switch can be used at the end of a regular function variable declaration
 
 `/e`	Display the contents of errno after the value (if val == -1)
 
+`/r`	Indicate that the marked argument also stores a return value (and should be displayed again upon return)
+
+`/R`	Like '/r' except any other formatting options are reset when the argument is displayed as a return value.
+
 
 The "/" switch at the end of a function variable declaration can be used as such, when displayed in conjunction with a bitmasked value:
 

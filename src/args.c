@@ -1408,7 +1408,7 @@ STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 	int len = 0, alen = *arglen;
 	int namelen = strlen(arg->name);
 	int is_char = 0;
-	int force_type_id = -1;
+	int force_type_id = -1, force_pointer = arg->pointer;
 
 	PRINT_VERBOSE(cfg, 1, "\t arg '%s %s', pval %p, len %d, pointer %d, dtype %d, type_id %d\n",
 			arg->type_name, arg->name, pval, alen, arg->pointer, arg->dtype, arg->type_id);
@@ -1455,13 +1455,16 @@ STATIC int getstr_pod(struct lt_config_shared *cfg, int dspname, struct lt_arg *
 //	is_char = (arg->type_id == LT_ARGS_TYPEID_CHAR) || (arg->type_id == LT_ARGS_TYPEID_UCHAR);
 	is_char = (arg->type_id == LT_ARGS_TYPEID_CHAR);
 
-	if (arg->pointer && arg->fmt && !strcmp(arg->fmt, "s")) {
+//	if (arg->pointer && arg->fmt && strchr(arg->fmt, 's')) {
+	// Let them crash it if they want.
+	if (arg->fmt && strchr(arg->fmt, 's')) {
 		is_char = 1;
 		force_type_id = LT_ARGS_TYPEID_CHAR;
+		force_pointer = 1;
 	} else
 		force_type_id = arg->type_id;
 
-	if ((arg->pointer && !is_char) || ((arg->pointer > 1) && is_char)) {
+	if ((force_pointer && !is_char) || ((force_pointer > 1) && is_char)) {
 
 		void *ptr = *((void**) pval);
 
@@ -1536,15 +1539,15 @@ do {                                                                 \
 
 		char *bm = lookup_bitmask_by_class(cfg, arg->bitmask_class, *((unsigned long *)pval), arg->fmt, bmstr, sizeof(bmstr));
 		len = snprintf(argbuf, alen, "%s", bm);
-	} else if (arg->fmt && (!strcmp(arg->fmt, "o"))) {
+	} else if (arg->fmt && (strchr(arg->fmt, 'o'))) {
 		ARGS_SPRINTF("0%o", unsigned int);
-	} else if (arg->fmt && (!strcmp(arg->fmt, "d"))) {
+	} else if (arg->fmt && (strchr(arg->fmt, 'd'))) {
 		ARGS_SPRINTF("%d", signed int);
-	} else if (arg->fmt && (!strcmp(arg->fmt, "u"))) {
+	} else if (arg->fmt && (strchr(arg->fmt, 'u'))) {
 		ARGS_SPRINTF("%d", unsigned int);
-	} else if (arg->fmt && (!strcmp(arg->fmt, "x"))) {
+	} else if (arg->fmt && (strchr(arg->fmt, 'x'))) {
 		ARGS_SPRINTF("0x%lx", unsigned long);
-	} else if (arg->fmt && (!strcmp(arg->fmt, "h"))) {
+	} else if (arg->fmt && (strchr(arg->fmt, 'h'))) {
 		char numbuf[32], *nptr;
 
 		memset(numbuf, 0, sizeof(numbuf));
@@ -1559,7 +1562,7 @@ do {                                                                 \
 		}
 
 		strncpy(argbuf, numbuf, alen);
-	} else if (arg->fmt && (!strcmp(arg->fmt, "p"))) {
+	} else if (arg->fmt && (strchr(arg->fmt, 'p'))) {
 		if (*((void **)pval) == NULL)
 			len = snprintf(argbuf, alen, "NULL");
 		else
@@ -1609,7 +1612,8 @@ do {                                                                 \
 			len = snprintf(argbuf, alen, "%s",  !*((unsigned char *) pval) ? "false" : "true");
 			break;
 		case LT_ARGS_TYPEID_CHAR:
-			if (arg->pointer) {
+		case LT_ARGS_TYPEID_UCHAR:
+			if (force_pointer) {
 
 				void *val = *((void**) pval);
 
@@ -1647,13 +1651,18 @@ do {                                                                 \
 				} else
 					len = snprintf(argbuf, alen, "NULL");
 			} else {
+				unsigned char this_char = *((unsigned char*) pval);
 
-				if (!isprint(*((char*) pval)))
-					len = snprintf(argbuf, alen, "0x%02x",
-							*((unsigned char*) pval));
+				if (isalnum(this_char) || ispunct(this_char) || (this_char == ' '))
+					len = snprintf(argbuf, alen, "'%c'", this_char);
+				else if (this_char == '\n')
+					len = snprintf(argbuf, alen, "\\n");
+				else if (this_char == '\r')
+					len = snprintf(argbuf, alen, "\\r");
+				else if (this_char == '\t')
+					len = snprintf(argbuf, alen, "\\t");
 				else
-					len = snprintf(argbuf, alen, "0x%02x \'%c\'",
-							*((unsigned char*) pval), *((char*) pval));
+					len = snprintf(argbuf, alen, "0x%.2x", this_char);
 			}
 			break;
 
@@ -1699,7 +1708,7 @@ out:
 	return 0;
 }
 
-int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg, void *pval, 
+int lt_args_cb_arg(struct lt_config_shared *cfg, struct lt_arg *arg, void *pval,
 		   struct lt_args_data *data, int last, int dspname, lt_tsd_t *tsd)
 {
 	int len = data->arglen;

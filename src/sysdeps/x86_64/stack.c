@@ -636,6 +636,21 @@ exit_transformer_callstack(char *symname, La_regs *inregs, void ***pargs, size_t
 	return -1;
 }
 
+STATIC int func_has_inargs(struct lt_args_sym *asym)
+{
+	size_t i;
+
+	for (i = 1; i < asym->argcnt; i++) {
+
+		// Input/output arguments are only applicable if pointers
+		if (asym->args[i]->fmt && (asym->args[i]->pointer > 0) &&
+			(strchr(asym->args[i]->fmt, 'r') || strchr(asym->args[i]->fmt, 'R')))
+			return 1;
+	}
+
+	return 0;
+}
+
 #ifdef TRANSFORMER_CRASH_PROTECTION
 	#define CRASH_PROLOGUE(x)	 do { if (tsd) { tsd->jmp_set = (sigsetjmp(tsd->crash_insurance, 1) == 0) ? x : 0; } } while (0)
 	#define CRASH_EPILOGUE(x)	 TSD_SET(jmp_set,0)
@@ -651,7 +666,8 @@ int lt_stack_process(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 	int i;
 
 	if (asym->args[LT_ARGS_RET]->latrace_custom_func_transformer ||
-		asym->args[LT_ARGS_RET]->latrace_custom_func_intercept) {
+			asym->args[LT_ARGS_RET]->latrace_custom_func_intercept ||
+			func_has_inargs(asym)) {
 		void **targs;
 		int tres = -1;
 
@@ -825,21 +841,26 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 {
 	struct lt_arg *arg;
 	void *pval;
-	int needs_callstack = 0;
+	int needs_callstack = 0, has_ret_inargs = 0;
+	size_t i;
 
 	arg = asym->args[LT_ARGS_RET];
 	pval = get_value(cfg, arg, regs, 1);
 	needs_callstack = ((asym->args[LT_ARGS_RET]->latrace_custom_func_transformer != NULL) ||
 		(asym->args[LT_ARGS_RET]->latrace_custom_func_intercept != NULL));
 
-	if (needs_callstack || asym->args[LT_ARGS_RET]->latrace_custom_struct_transformer) {
+	if (func_has_inargs(asym))
+		needs_callstack = has_ret_inargs = 1;
+
+	if (needs_callstack || has_ret_inargs || asym->args[LT_ARGS_RET]->latrace_custom_struct_transformer) {
 		void **inargs = NULL;
 		void *retval = pval;
 		size_t inargs_size = 0;
 		int tres = -1;
 
 //		if (!silent && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size, tsd) < 0) {
-		if (needs_callstack && exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size, tsd) < 0) {
+		if ((needs_callstack || has_ret_inargs) &&
+				(exit_transformer_callstack(asym->name, iregs, &inargs, &inargs_size, tsd) < 0)) {
 			PRINT_ERROR_SAFE("%s", "Error retrieving function entry arguments from transformer call stack\n");
 			inargs = NULL;
 			inargs_size = 0;
@@ -890,6 +911,56 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 
 			CRASH_EPILOGUE();
 		}
+
+		// Should only be reached if we have a return arg struct transformer and NOT a function transformer,
+		// or if the function transformer fails.
+		if (!silent && inargs && has_ret_inargs && ((tres < 0) || (!asym->args[LT_ARGS_RET]->latrace_custom_func_transformer))) {
+			size_t nleft;
+			int first = 1;
+
+			if (!tres)
+				data->args_totlen += strlen(data->args_buf + data->args_totlen);
+
+#define APPEND_ARG_STR(fmt,val)	\
+	nleft = data->args_len - data->args_totlen;	\
+	snprintf(data->args_buf+data->args_totlen, nleft, fmt, val);	\
+	data->args_totlen += strlen(data->args_buf+data->args_totlen);	\
+
+			APPEND_ARG_STR("%s", "{");
+
+			for (i = 1; i < asym->argcnt; i++) {
+				int trace_level = 0;
+
+				if (asym->args[i]->fmt && (asym->args[i]->pointer > 0) && (strchr(asym->args[i]->fmt, 'r')))
+					trace_level = 1;
+				else if (asym->args[i]->fmt && (asym->args[i]->pointer > 0) && (strchr(asym->args[i]->fmt, 'R')))
+					trace_level = 2;
+
+				if (trace_level > 0) {
+					void **argval = (void **)inargs[i-1];
+					struct lt_arg arg_copy;
+					char *prefix;
+
+					prefix = first ? "%s=" : ", %s=";
+					first = 0;
+
+					APPEND_ARG_STR(prefix, asym->args[i]->name);
+					memcpy(&arg_copy, asym->args[i], sizeof(struct lt_arg));
+
+					if (trace_level == 2)
+						arg_copy.fmt = "";
+					else
+						arg_copy.pointer--;
+
+					// Our callback occurs on the dereferenced pointer type of the argument.
+					lt_args_cb_arg(cfg, &arg_copy, argval, data, 1, 0, tsd);
+				}
+
+			}
+
+			APPEND_ARG_STR("%s", "} ");
+		}
+
 
 		if (inargs)
 #ifdef USE_GLIBC_FEATURES
