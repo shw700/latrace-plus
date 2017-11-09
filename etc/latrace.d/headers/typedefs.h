@@ -25,7 +25,7 @@ typedef u_int __uid_t;
 typedef u_int uid_t;
 typedef u_int __gid_t;
 typedef u_int gid_t;
-typedef u_int __pid_t;
+typedef int __pid_t;
 typedef int pid_t;
 typedef u_int __mode_t;
 typedef u_int mode_t;

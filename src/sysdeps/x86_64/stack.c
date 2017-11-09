@@ -953,7 +953,7 @@ int lt_stack_process_ret(struct lt_config_shared *cfg, struct lt_args_sym *asym,
 						arg_copy.pointer--;
 
 					// Our callback occurs on the dereferenced pointer type of the argument.
-					lt_args_cb_arg(cfg, &arg_copy, argval, data, 1, 0, tsd);
+					lt_args_cb_arg(cfg, &arg_copy, *argval, data, 1, 0, tsd);
 				}
 
 			}
